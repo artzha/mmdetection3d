@@ -553,6 +553,7 @@ class GTDatabaseCreater:
                 ])
 
         elif self.dataset_class_name == 'WaymoDataset':
+            print("Saving waymo")
             file_client_args = dict(backend='disk')
             dataset_cfg.update(
                 test_mode=False,
@@ -576,7 +577,7 @@ class GTDatabaseCreater:
                         with_label_3d=True,
                         file_client_args=file_client_args)
                 ])
-
+        print("Building dataset")
         dataset = build_dataset(dataset_cfg)
         self.pipeline = dataset.pipeline
         if self.database_save_path is None:
@@ -598,7 +599,7 @@ class GTDatabaseCreater:
             input_dict = dataset.get_data_info(i)
             dataset.pre_pipeline(input_dict)
             return input_dict
-
+        print("Create dataset single")
         multi_db_infos = mmcv.track_parallel_progress(
             self.create_single, ((loop_dataset(i)
                                   for i in range(len(dataset))), len(dataset)),

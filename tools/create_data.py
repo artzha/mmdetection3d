@@ -6,6 +6,7 @@ from tools.data_converter import indoor_converter as indoor
 from tools.data_converter import kitti_converter as kitti
 from tools.data_converter import lyft_converter as lyft_converter
 from tools.data_converter import nuscenes_converter as nuscenes_converter
+from tools.data_converter import coda_converter as coda_converter
 from tools.data_converter.create_gt_database import (
     GTDatabaseCreater, create_groundtruth_database)
 
@@ -197,6 +198,25 @@ def waymo_data_prep(root_path,
         with_mask=False,
         num_worker=workers).create()
 
+def coda_data_prep(root_path,
+                    info_prefix,
+                    version,
+                    out_dir,
+                    workers,
+                    max_sweeps=5):
+    """Prepare the info file for CODa dataset.
+
+    Args:
+        root_path (str): Path of dataset root.
+        info_prefix (str): The prefix of info filenames.
+        out_dir (str): Output directory of the generated info file.
+        workers (int): Number of threads to be used.
+        max_sweeps (int, optional): Number of input consecutive frames.
+            Default: 5. Here we store pose information of these frames
+            for later use.
+    """
+    coda_converter.create_coda_infos(
+        root_path, info_prefix, version=version, max_sweeps=max_sweeps)
 
 parser = argparse.ArgumentParser(description='Data converter arg parser')
 parser.add_argument('dataset', metavar='kitti', help='name of the dataset')

@@ -410,7 +410,7 @@ class LoadPointsFromFile(object):
                 points = np.load(pts_filename)
             else:
                 points = np.fromfile(pts_filename, dtype=np.float32)
-
+        
         return points
 
     def __call__(self, results):
@@ -430,6 +430,10 @@ class LoadPointsFromFile(object):
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         attribute_dims = None
+
+        #ARTHUR NORMALIZE PC INTENSITY
+        points[:, 3] = np.tanh(points[:, 3])
+        #ENDARTHUR
 
         if self.shift_height:
             floor_height = np.percentile(points[:, 2], 0.99)
