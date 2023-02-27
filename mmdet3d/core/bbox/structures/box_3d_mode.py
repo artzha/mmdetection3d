@@ -144,8 +144,11 @@ class Box3DMode(IntEnum):
             if rt_mat is None:
                 rt_mat = arr.new_tensor([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
             xyz_size = torch.cat([x_size, y_size, z_size], dim=-1)
+            print("Entered here")
             if with_yaw:
-                yaw = yaw + np.pi / 2
+                print("Entered yaw")
+                # yaw = -yaw + np.pi / 2
+                yaw = -yaw
                 yaw = limit_period(yaw, period=np.pi * 2)
         elif src == Box3DMode.DEPTH and dst == Box3DMode.LIDAR:
             if rt_mat is None:
