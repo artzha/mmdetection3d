@@ -4,14 +4,20 @@ import argparse
 import copy
 import os
 import time
+
 import warnings
 from os import path as osp
+import datetime
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 import mmcv
 import torch
 import torch.distributed as dist
 from mmcv import Config, DictAction
 from mmcv.runner import get_dist_info, init_dist
+
+torch.backends.cudnn.benchmark=False
+torch.backends.cudnn.deterministic=True
 
 from mmdet import __version__ as mmdet_version
 from mmdet3d import __version__ as mmdet3d_version
@@ -164,11 +170,14 @@ def main():
         cfg.optimizer['lr'] = cfg.optimizer['lr'] * len(cfg.gpu_ids) / 8
 
     # init distributed env first, since logger depends on the dist info.
+    # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':
         distributed = False
     else:
         distributed = True
-        init_dist(args.launcher, **cfg.dist_params)
+        init_dist(args.launcher,
+                      timeout=datetime.timedelta(seconds=18000),
+                      **cfg.dist_params)
         # re-set gpu_ids with distributed training mode
         _, world_size = get_dist_info()
         cfg.gpu_ids = range(world_size)

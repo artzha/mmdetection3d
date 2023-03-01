@@ -17,7 +17,7 @@ point_cloud_range = [-76.8, -51.2, -2, 76.8, 51.2, 4]
 # point_cloud_range = [-25.6, 25.6, -2, -25.6, 25.6, 4]
 input_modality = dict(use_lidar=True, use_camera=False)
 
-evaluation = dict(interval=1)  # This evaluate the model per 1 epoch.
+evaluation = dict(interval=6)  # This evaluate the model per 6 epochs.
 
 model = dict(
     pts_voxel_layer=dict(
