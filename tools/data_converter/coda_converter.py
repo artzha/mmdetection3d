@@ -35,18 +35,12 @@ class CODa2KITTI(object):
 
         self.selected_coda_classes = ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
 
-        # Only data collected in specific locations will be converted
-        # If set None, this filter is disabled
-        # Available options: location_sf (main dataset)
-        self.selected_waymo_locations = None
-        self.save_track_id = False
-
         # turn on eager execution for older tensorflow versions
         if int(tf.__version__.split('.')[0]) < 2:
             tf.enable_eager_execution()
 
         self.lidar_list = [
-            'CENTER'
+            'os1'
         ]
         self.type_list = [
             'BIKE',

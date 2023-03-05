@@ -1,5 +1,7 @@
 # optimizer
 # This schedule is mainly used by models on nuScenes dataset
+# optimizer = dict(type='AdamW', lr=0.001, weight_decay=0.01)
+# This schedule is 6 GPU with 2samples/gpu on waymo
 optimizer = dict(type='AdamW', lr=0.001, weight_decay=0.01)
 # max_norm=10 is better for SECOND
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
