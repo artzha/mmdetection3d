@@ -1,4 +1,4 @@
-ARG PYTORCH="1.12.1"
+ARG PYTORCH="1.10.0"
 ARG CUDA="11.4"
 ARG CUDNN="8"
 ARG MMCV="1.7.1"
@@ -36,9 +36,13 @@ COPY . /mmdetection3d
 WORKDIR /mmdetection3d
 ENV FORCE_CUDA="1"
 RUN pip install -r requirements/build.txt
-RUN pip install cumm-cu113 spconv-cu113
+RUN pip install -r requirements/optional.txt
+RUN pip install -r requirements/runtime.txt
+RUN pip install cumm-cu114 spconv-cu114
 RUN pip install -v -e .
 
 # Fix fraction gcd to math deprecation: https://github.com/smicallef/spiderfoot/issues/1124
 RUN pip install networkx==2.5
+RUN pip install tensorflow==2.6.0
+RUN pip install protobuf==3.20.0
 
