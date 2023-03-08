@@ -43,6 +43,6 @@ RUN pip install -v -e .
 
 # Fix fraction gcd to math deprecation: https://github.com/smicallef/spiderfoot/issues/1124
 RUN pip install networkx==2.5
-RUN pip install tensorflow==2.6.0
+RUN pip install tensorflow==2.5.0
 RUN pip install protobuf==3.20.0
 
