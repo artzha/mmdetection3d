@@ -147,8 +147,8 @@ class Box3DMode(IntEnum):
             print("Entered here")
             if with_yaw:
                 print("Entered yaw")
-                # yaw = -yaw + np.pi / 2
-                yaw = -yaw
+                yaw = yaw + np.pi / 2
+                # yaw = -yaw
                 yaw = limit_period(yaw, period=np.pi * 2)
         elif src == Box3DMode.DEPTH and dst == Box3DMode.LIDAR:
             if rt_mat is None:
@@ -156,6 +156,8 @@ class Box3DMode(IntEnum):
             xyz_size = torch.cat([x_size, y_size, z_size], dim=-1)
             if with_yaw:
                 yaw = yaw - np.pi / 2
+                print("Entered yaw2")
+                # yaw = -yaw
                 yaw = limit_period(yaw, period=np.pi * 2)
         else:
             raise NotImplementedError(
