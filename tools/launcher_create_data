@@ -1,0 +1,2 @@
+ibrun -n 1 -o 0 task_affinity singularity exec docker://artzha/mmdetection3d:latest python3 /mmdetection3d/tools/create_data.py kitti --root-path /scratch/09156/arthurz/mmlab/kitti --out-dir /scratch/09156/arthurz/mmlab/kitti --extra-tag kitti --with-plane >> create_mmlab_data_task${LAUNCHER_TSK_ID} &
+wait
