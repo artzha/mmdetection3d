@@ -500,23 +500,60 @@ class NuScenesDataset(Custom3DDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
-        result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
+        
+        if 'kitti' in metric:
+            result_files, tmp_dir = self.format_results(
+                results,
+                pklfile_prefix,
+                submission_prefix,
+                data_format='kitti')
+            from mmdet3d.core.evaluation import kitti_eval
+            gt_annos = [info['annos'] for info in self.data_infos]
 
-        if isinstance(result_files, dict):
-            results_dict = dict()
-            for name in result_names:
-                print('Evaluating bboxes of {}'.format(name))
-                ret_dict = self._evaluate_single(result_files[name])
-            results_dict.update(ret_dict)
-        elif isinstance(result_files, str):
-            results_dict = self._evaluate_single(result_files)
+            if isinstance(result_files, dict):
+                ap_dict = dict()
+                for name, result_files_ in result_files.items():
+                    eval_types = ['bev', '3d']
+                    ap_result_str, ap_dict_ = kitti_eval(
+                        gt_annos,
+                        result_files_,
+                        self.CLASSES,
+                        eval_types=eval_types)
+                    for ap_type, ap in ap_dict_.items():
+                        ap_dict[f'{name}/{ap_type}'] = float(
+                            '{:.4f}'.format(ap))
 
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
+                    print_log(
+                        f'Results of {name}:\n' + ap_result_str, logger=logger)
 
-        if show or out_dir:
-            self.show(results, out_dir, show=show, pipeline=pipeline)
-        return results_dict
+            else:
+                ap_result_str, ap_dict = kitti_eval(
+                    gt_annos,
+                    result_files,
+                    self.CLASSES,
+                    eval_types=['bev', '3d'])
+                print_log('\n' + ap_result_str, logger=logger)
+
+            return ap_dict
+        else:
+            result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
+
+            if isinstance(result_files, dict):
+                results_dict = dict()
+                for name in result_names:
+                    print('Evaluating bboxes of {}'.format(name))
+                    ret_dict = self._evaluate_single(result_files[name])
+                results_dict.update(ret_dict)
+            elif isinstance(result_files, str):
+                results_dict = self._evaluate_single(result_files)
+
+            if tmp_dir is not None:
+                tmp_dir.cleanup()
+
+            if show or out_dir:
+                self.show(results, out_dir, show=show, pipeline=pipeline)
+
+            return results_dict
 
     def _build_default_pipeline(self):
         """Build the default pipeline for this dataset."""
@@ -525,7 +562,7 @@ class NuScenesDataset(Custom3DDataset):
                 type='LoadPointsFromFile',
                 coord_type='LIDAR',
                 load_dim=5,
-                use_dim=5,
+                use_dim=4,
                 file_client_args=dict(backend='disk')),
             dict(
                 type='LoadPointsFromMultiSweeps',

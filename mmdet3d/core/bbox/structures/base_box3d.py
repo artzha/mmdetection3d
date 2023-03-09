@@ -324,6 +324,10 @@ class BaseInstance3DBoxes(object):
                 self.tensor[item].view(1, -1),
                 box_dim=self.box_dim,
                 with_yaw=self.with_yaw)
+
+        # print("item device ", item.device)
+        # print("tensor device ", self.tensor.device)
+        # import pdb; pdb.set_trace()
         b = self.tensor[item]
         assert b.dim() == 2, \
             f'Indexing on Boxes with {item} failed to return a matrix!'

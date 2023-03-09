@@ -685,6 +685,7 @@ def kitti_eval(gt_annos,
                             [0.5, 0.25, 0.25, 0.5, 0.25],
                             [0.5, 0.25, 0.25, 0.5, 0.25]])
     min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
+    print("Current classes ", current_classes)
     class_to_name = {
         0: 'Car',
         1: 'Pedestrian',
@@ -692,7 +693,12 @@ def kitti_eval(gt_annos,
         3: 'Van',
         4: 'Person_sitting',
     }
+
     name_to_class = {v: n for n, v in class_to_name.items()}
+    # ARTHUR added additional name to class to support other datasets
+    name_to_class['car'] = 0
+    name_to_class['bicycle'] = 2
+    name_to_class['pedestrian'] = 1
     if not isinstance(current_classes, (list, tuple)):
         current_classes = [current_classes]
     current_classes_int = []
@@ -906,6 +912,11 @@ def kitti_eval_coco_style(gt_annos, dt_annos, current_classes):
         4: [0.25, 0.7, 10],
     }
     name_to_class = {v: n for n, v in class_to_name.items()}
+    # ARTHUR added additional name to class to support other datasets
+    name_to_class['car'] = 0
+    name_to_class['bicycle'] = 2
+    name_to_class['pedestrian'] = 1
+
     if not isinstance(current_classes, (list, tuple)):
         current_classes = [current_classes]
     current_classes_int = []

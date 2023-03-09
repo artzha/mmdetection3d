@@ -138,6 +138,7 @@ class AnchorTrainMixin(object):
                 current_anchor_num += current_anchors.size(0)
                 if self.assign_per_class:
                     gt_per_cls = (gt_labels == i)
+                    gt_per_cls = gt_per_cls.to(device=gt_bboxes.tensor.device)
                     anchor_targets = self.anchor_target_single_assigner(
                         assigner, current_anchors, gt_bboxes[gt_per_cls, :],
                         gt_bboxes_ignore, gt_labels[gt_per_cls], input_meta,

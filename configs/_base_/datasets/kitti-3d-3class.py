@@ -154,4 +154,4 @@ data = dict(
         box_type_3d='LiDAR',
         file_client_args=file_client_args))
 
-evaluation = dict(interval=1, pipeline=eval_pipeline)
+evaluation = dict(interval=4, pipeline=eval_pipeline)
