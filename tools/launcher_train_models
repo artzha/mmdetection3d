@@ -1,0 +1,4 @@
+ibrun -n 1 -o 0 task_affinity singularity exec --nv docker://artzha/mmdetection3d:latest bash tools/dist_train.sh ${CONFIG_PILLARS_WAYMO} ${NUM_GPUS} --work-dir ${PILLAR_WAYMO_WORK_DIR} &
+ibrun -n 1 -o 1 task_affinity singularity exec --nv docker://artzha/mmdetection3d:latest bash toos/dist_train.sh ${CONFIG_PILLARS_NUSCENES} ${NUM_GPUS} --work-dir ${PILLAR_NUSCENES_WORK_DIR} &
+ibrun -n 1 -o 2 task_affinity singularity exec --nv docker://artzha/mmdetection3d:latest bash toos/dist_train.sh ${CONFIG_PILLARS_KITTI} ${NUM_GPUS} --work-dir ${PILLAR_KITTI_WORK_DIR} &
+wait
