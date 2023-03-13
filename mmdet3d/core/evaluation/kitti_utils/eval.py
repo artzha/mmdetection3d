@@ -717,13 +717,9 @@ def kitti_eval(gt_annos,
         3: 'Van',
         4: 'Person_sitting',
     }
-    # import pdb; pdb.set_trace()
 
     name_to_class = {v: n for n, v in class_to_name.items()}
-    # ARTHUR added additional name to class to support other datasets
-    # name_to_class['car'] = 0
-    # name_to_class['bicycle'] = 2
-    # name_to_class['pedestrian'] = 1
+
     if not isinstance(current_classes, (list, tuple)):
         current_classes = [current_classes]
     current_classes_int = []
