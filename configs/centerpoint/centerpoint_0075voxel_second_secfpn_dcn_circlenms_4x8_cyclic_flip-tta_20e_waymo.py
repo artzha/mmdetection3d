@@ -8,7 +8,7 @@ _base_ = [
 file_client_args = dict(backend='disk')
 
 class_names = ['Car', 'Pedestrian', 'Cyclist']
-point_cloud_range = [-74.88, -74.88, -2, 74.88, 74.88, 4]
+point_cloud_range = [-74.85, -74.85, -2, 74.85, 74.85, 4]
 
 model = dict(
     pts_bbox_head=dict(
