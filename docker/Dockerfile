@@ -56,8 +56,8 @@
 # RUN pip install tensorflow==2.5.0
 # RUN pip install protobuf==3.20.0
 
-ARG PYTORCH="1.9.0"
-ARG CUDA="11.1"
+ARG PYTORCH="1.10.0"
+ARG CUDA="11.3"
 ARG CUDNN="8"
 
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
@@ -87,7 +87,7 @@ RUN apt-get update \
 
 # Install MMEngine, MMCV and MMDetection
 RUN pip install openmim
-RUN mim install --no-cache-dir mmcv-full==1.7.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.10/index.html
+RUN mim install --no-cache-dir mmcv-full==1.7.0 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10/index.html
 RUN mim install mmengine mmdet mmsegmentation
 
 # Install MMDetection3D
@@ -99,7 +99,7 @@ ENV FORCE_CUDA="1"
 RUN pip install -r requirements/build.txt
 RUN pip install -r requirements/optional.txt
 RUN pip install -r requirements/runtime.txt
-RUN pip install cumm-cu111 spconv-cu111
+RUN pip install cumm-cu113 spconv-cu113
 RUN pip install -v -e .
 
-RUN pip install protobuf==3.9.2
+# RUN pip install protobuf==3.9.2

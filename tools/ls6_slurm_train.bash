@@ -17,21 +17,33 @@ cd /work/09156/arthurz/mmdetection3d
 export NUM_GPUS=3
 export CUDA_VISIBLE_DEVICES=0,1,2
 
-export PILLAR_WAYMO_MODEL=hv_pointpillars_secfpn_sbn_2x16_2x_waymo-3d-3class
-export CONFIG_PILLARS_WAYMO=configs/pointpillars/${PILLAR_WAYMO_MODEL}.py
-export PILLAR_WAYMO_WORK_DIR=work_dirs/${PILLAR_WAYMO_MODEL}
+#PointPillar Models
+# export WAYMO_MODEL=hv_pointpillars_secfpn_sbn_2x16_2x_waymo-3d-3class
+# export CONFIG_WAYMO=configs/pointpillars/${WAYMO_MODEL}.py
+# export PILLAR_WAYMO_WORK_DIR=work_dirs/${PILLAR_WAYMO_MODEL}
 
-export PILLAR_NUSCENES_MODEL=hv_pointpillars_fpn_sbn-all_fp16_2x8_2x_nus-3d
-export CONFIG_PILLARS_NUSCENES=configs/pointpillars/${PILLAR_NUSCENES_MODEL}.py
-export PILLAR_NUSCENES_WORK_DIR=work_dirs/${PILLAR_NUSCENES_MODEL}
+# export NUSCENES_MODEL=hv_pointpillars_fpn_sbn-all_fp16_2x8_2x_nus-3d
+# export CONFIG_NUSCENES=configs/pointpillars/${NUSCENES_MODEL}.py
+# export NUSCENES_WORK_DIR=work_dirs/${NUSCENES_MODEL}
 
-export PILLAR_KITTI_MODEL=hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class
-export CONFIG_PILLARS_KITTI=configs/pointpillars/${PILLAR_KITTI_MODEL}.py
-export PILLAR_KITTI_WORK_DIR=work_dirs/${PILLAR_KITTI_MODEL}
+# export KITTI_MODEL=hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class
+# export CONFIG_KITTI=configs/pointpillars/${KITTI_MODEL}.py
+# export KITTI_WORK_DIR=work_dirs/${KITTI_MODEL}
 
+# CenterPoint Models
+export PORT=29501
+export WAYMO_MODEL=centerpoint_0075voxel_second_secfpn_dcn_circlenms_4x8_cyclic_flip-tta_20e_waymo
+export CONFIG_WAYMO=configs/centerpoint/${WAYMO_MODEL}.py
+export WAYMO_WORK_DIR=work_dirs/${WAYMO_MODEL}
+
+# Uncomment to launch kitti
+# module load launcher_gpu
+# export LAUNCHER_WORKDIR=/work/09156/arthurz/mmdetection3d
+# export LAUNCHER_JOB_FILE=tools/launcher_train_kitti_pp
+
+# Uncomment to launch waymo
 module load launcher_gpu
 export LAUNCHER_WORKDIR=/work/09156/arthurz/mmdetection3d
-export LAUNCHER_JOB_FILE=tools/launcher_train_kitti_pp
+export LAUNCHER_JOB_FILE=tools/launcher_train_waymo
 
 ${LAUNCHER_DIR}/paramrun
-
