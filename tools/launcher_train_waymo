@@ -1,0 +1,2 @@
+ibrun -n 1 -o 0 task_affinity singularity exec --nv docker://artzha/mmdetection3d:latest bash tools/dist_train.sh ${CONFIG_PILLARS_KITTI} ${NUM_GPUS} --work-dir ${PILLAR_KITTI_WORK_DIR} >> launcher_train_models_task${LAUNCHER_TSK_ID}  &
+wait
