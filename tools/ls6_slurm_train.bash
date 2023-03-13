@@ -2,13 +2,13 @@
 #SBATCH -J train_mmlab_model               # Job name
 #SBATCH -o train_mmlab_model.%j            # Name of stdout output file (%j expands to jobId)
 #SBATCH -p gpu-a100                        # Queue name
-#SBATCH -N 3                               # Total number of nodes requested (128 cores/node)
-#SBATCH -n 9                               # Total number of mpi tasks requested
-#SBATCH -t 00:05:00                        # Run time (hh:mm:ss)
+#SBATCH -N 1                               # Total number of nodes requested (128 cores/node)
+#SBATCH -n 1                               # Total number of mpi tasks requested
+#SBATCH -t 00:30:00                        # Run time (hh:mm:ss)
 #SBATCH -A IRI23004                        # Allocation name
 
 export OMP_NUM_THREADS=3
-
+export SINGULARITYENV_CUDA_VISIBLE_DEVICES=0,1,2
 module load tacc-apptainer
 module load tacc-singularity
 cd /work/09156/arthurz/mmdetection3d
@@ -31,7 +31,7 @@ export PILLAR_KITTI_WORK_DIR=work_dirs/${PILLAR_KITTI_MODEL}
 
 module load launcher_gpu
 export LAUNCHER_WORKDIR=/work/09156/arthurz/mmdetection3d
-export LAUNCHER_JOB_FILE=launcher_train_models
+export LAUNCHER_JOB_FILE=tools/launcher_train_kitti_pp
 
 ${LAUNCHER_DIR}/paramrun
 
