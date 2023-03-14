@@ -101,11 +101,7 @@ model = dict(
             use_rotate_nms=True,
             nms_across_levels=False,
             nms_pre=4096,
-            nms_thr=0.25,
-<<<<<<< HEAD
-            score_thr=0.2,
-=======
-            score_thr=0.5,
->>>>>>> 28dff9188f694a2e5c4d8f2b3a81eb89f3f0257b
+            nms_thr=0.55,
+            score_thr=0.05,
             min_bbox_size=0,
             max_num=500)))
