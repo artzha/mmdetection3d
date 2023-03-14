@@ -1,25 +1,28 @@
-_base_ = [
-    '../_base_/datasets/nus-3d.py',
-    '../_base_/models/centerpoint_01voxel_second_secfpn_nus.py',
-    '../_base_/schedules/cyclic_20e.py', '../_base_/default_runtime.py'
-]
+_base_ = ['./centerpoint_01voxel_second_secfpn_4x8_cyclic_20e_nus_3class.py']
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
-point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
-# point_cloud_range = [-25.6, 25.6, -2, -25.6, 25.6, 4]
+voxel_size = [0.075, 0.075, 0.2]
+point_cloud_range = [-54, -54, -5.0, 54, 54, 3.0]
 # For nuScenes we usually do 10-class detection
 class_names = [
-    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
-    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
+    'car', 'bicycle', 'pedestrian'
 ]
 
 model = dict(
-    pts_voxel_layer=dict(point_cloud_range=point_cloud_range),
-    pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range[:2])),
-    # model training and testing settings
-    train_cfg=dict(pts=dict(point_cloud_range=point_cloud_range)),
-    test_cfg=dict(pts=dict(pc_range=point_cloud_range[:2])))
+    pts_voxel_layer=dict(
+        voxel_size=voxel_size, point_cloud_range=point_cloud_range),
+    pts_middle_encoder=dict(sparse_shape=[41, 1440, 1440]),
+    pts_bbox_head=dict(
+        bbox_coder=dict(
+            voxel_size=voxel_size[:2], pc_range=point_cloud_range[:2])),
+    train_cfg=dict(
+        pts=dict(
+            grid_size=[1440, 1440, 40],
+            voxel_size=voxel_size,
+            point_cloud_range=point_cloud_range)),
+    test_cfg=dict(
+        pts=dict(voxel_size=voxel_size[:2], pc_range=point_cloud_range[:2])))
 
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/'
@@ -33,27 +36,13 @@ db_sampler = dict(
         filter_by_difficulty=[-1],
         filter_by_min_points=dict(
             car=5,
-            truck=5,
-            bus=5,
-            trailer=5,
-            construction_vehicle=5,
-            traffic_cone=5,
-            barrier=5,
-            motorcycle=5,
             bicycle=5,
             pedestrian=5)),
     classes=class_names,
     sample_groups=dict(
         car=2,
-        truck=3,
-        construction_vehicle=7,
-        bus=4,
-        trailer=6,
-        barrier=2,
-        motorcycle=6,
         bicycle=6,
-        pedestrian=2,
-        traffic_cone=2),
+        pedestrian=2),
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
@@ -129,44 +118,8 @@ test_pipeline = [
             dict(type='Collect3D', keys=['points'])
         ])
 ]
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
-eval_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=5,
-        use_dim=5,
-        file_client_args=file_client_args),
-    dict(
-        type='LoadPointsFromMultiSweeps',
-        sweeps_num=9,
-        use_dim=[0, 1, 2, 3, 4],
-        file_client_args=file_client_args,
-        pad_empty_sweeps=True,
-        remove_close=True),
-    dict(
-        type='DefaultFormatBundle3D',
-        class_names=class_names,
-        with_label=False),
-    dict(type='Collect3D', keys=['points'])
-]
 
 data = dict(
-    train=dict(
-        type='CBGSDataset',
-        dataset=dict(
-            type=dataset_type,
-            data_root=data_root,
-            ann_file=data_root + 'nuscenes_infos_train.pkl',
-            pipeline=train_pipeline,
-            classes=class_names,
-            test_mode=False,
-            use_valid_flag=True,
-            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR')),
-    val=dict(pipeline=test_pipeline, classes=class_names),
-    test=dict(pipeline=test_pipeline, classes=class_names))
-
-evaluation = dict(interval=20, pipeline=eval_pipeline)
+    train=dict(dataset=dict(pipeline=train_pipeline)),
+    val=dict(pipeline=test_pipeline),
+    test=dict(pipeline=test_pipeline))

@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/nus-3d.py',
+    '../_base_/datasets/nus-3d-3class.py',
     '../_base_/models/centerpoint_01voxel_second_secfpn_nus.py',
     '../_base_/schedules/cyclic_20e.py', '../_base_/default_runtime.py'
 ]
@@ -8,10 +8,10 @@ _base_ = [
 # cloud range accordingly
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 # point_cloud_range = [-25.6, 25.6, -2, -25.6, 25.6, 4]
-# For nuScenes we usually do 10-class detection
+
+# For nuScenes we do 3 class detection for zero shot
 class_names = [
-    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
-    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
+    'car', 'bicycle', 'pedestrian'
 ]
 
 model = dict(
@@ -33,27 +33,13 @@ db_sampler = dict(
         filter_by_difficulty=[-1],
         filter_by_min_points=dict(
             car=5,
-            truck=5,
-            bus=5,
-            trailer=5,
-            construction_vehicle=5,
-            traffic_cone=5,
-            barrier=5,
-            motorcycle=5,
             bicycle=5,
             pedestrian=5)),
     classes=class_names,
     sample_groups=dict(
         car=2,
-        truck=3,
-        construction_vehicle=7,
-        bus=4,
-        trailer=6,
-        barrier=2,
-        motorcycle=6,
         bicycle=6,
-        pedestrian=2,
-        traffic_cone=2),
+        pedestrian=2),
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',

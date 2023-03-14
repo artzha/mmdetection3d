@@ -686,6 +686,30 @@ def kitti_eval(gt_annos,
                             [0.5, 0.25, 0.25, 0.5, 0.25]])
     min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
     print("Current classes ", current_classes)
+
+    #Waymo ClassRemap
+    # dt_to_gt_class_map = {
+    #     'Pedestrian': 'Car',
+    #     'Cyclist': 'Pedestrian',
+    #     'Car' :'Cyclist'
+    # }
+    #nuScenes ClassRemap
+    dt_to_gt_class_map = {
+        'Pedestrian': 'Car',
+        'Cyclist': 'Cyclist',
+        'Car' :'Pedestrian'
+    }
+    #Remap all det classes using waymo class remap
+    # import pdb; pdb.set_trace()
+    for anno_idx, anno in enumerate(dt_annos):
+        anno_names = anno['name']
+        for name_idx, name in enumerate(anno_names):
+            old_name = anno_names[name_idx]
+            try:
+                dt_annos[anno_idx]['name'][name_idx] = dt_to_gt_class_map[old_name]
+            except Exception as e:
+                print("Erroneous class name given")
+                import pdb; pdb.set_trace()
     class_to_name = {
         0: 'Car',
         1: 'Pedestrian',
@@ -695,10 +719,7 @@ def kitti_eval(gt_annos,
     }
 
     name_to_class = {v: n for n, v in class_to_name.items()}
-    # ARTHUR added additional name to class to support other datasets
-    name_to_class['car'] = 0
-    name_to_class['bicycle'] = 2
-    name_to_class['pedestrian'] = 1
+
     if not isinstance(current_classes, (list, tuple)):
         current_classes = [current_classes]
     current_classes_int = []
@@ -708,6 +729,8 @@ def kitti_eval(gt_annos,
         else:
             current_classes_int.append(curcls)
     current_classes = current_classes_int
+    # import pdb; pdb.set_trace()
+
     min_overlaps = min_overlaps[:, :, current_classes]
     result = ''
     # check whether alpha is valid
