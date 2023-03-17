@@ -1,13 +1,55 @@
-_base_ = [
-    '../_base_/models/hv_pointpillars_secfpn_kitti.py',
-    '../_base_/datasets/kitti-3d-3class.py',
-    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
-]
+# _base_ = [
+#     '../_base_/models/hv_pointpillars_secfpn_kitti.py',
+#     '../_base_/datasets/kitti-3d-3class.py',
+#     '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+# ]
 
-point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1]
+"""
+Evaluate on KITTI
+"""
+# point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1]
+# # dataset settings
+# data_root = 'data/kitti/'
+# class_names = ['Pedestrian', 'Cyclist', 'Car']
+# # PointPillars adopted a different sampling strategies among classes
+
+# file_client_args = dict(backend='disk')
+# # Uncomment the following if use ceph or other file clients.
+# # See https://mmcv.readthedocs.io/en/latest/api.html#mmcv.fileio.FileClient
+# # for more details.
+# # file_client_args = dict(
+# #     backend='petrel',
+# #     path_mapping=dict({
+# #         './data/kitti/':
+# #         's3://openmmlab/datasets/detection3d/kitti/',
+# #         'data/kitti/':
+# #         's3://openmmlab/datasets/detection3d/kitti/'
+# #     }))
+
+# db_sampler = dict(
+#     data_root=data_root,
+#     info_path=data_root + 'kitti_dbinfos_train.pkl',
+#     rate=1.0,
+#     prepare=dict(
+#         filter_by_difficulty=[-1],
+#         filter_by_min_points=dict(Car=5, Pedestrian=5, Cyclist=5)),
+#     classes=class_names,
+#     sample_groups=dict(Car=15, Pedestrian=15, Cyclist=15),
+#     points_loader=dict(
+#         type='LoadPointsFromFile',
+#         coord_type='LIDAR',
+#         load_dim=4,
+#         use_dim=4,
+#         file_client_args=file_client_args),
+#     file_client_args=file_client_args)
+""""""
+
+"""Evaluate on nuScenes"""
+point_cloud_range = [-50, -50, -5, 50, 50, 3]
 # dataset settings
-data_root = 'data/kitti/'
-class_names = ['Pedestrian', 'Cyclist', 'Car']
+data_root = 'data/nuscenes/'
+class_names = ['car', 'bicycle', 'pedestrian']
+
 # PointPillars adopted a different sampling strategies among classes
 
 file_client_args = dict(backend='disk')
@@ -39,6 +81,8 @@ db_sampler = dict(
         use_dim=4,
         file_client_args=file_client_args),
     file_client_args=file_client_args)
+
+""""""
 
 # PointPillars uses different augmentation hyper parameters
 train_pipeline = [
@@ -114,3 +158,14 @@ runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=20)
+
+
+###Uncomment Below to eval on nuscenes
+_base_ = [
+    '../_base_/models/hv_pointpillars_secfpn_kitti.py',
+    '../_base_/datasets/nus-3d-3class.py',
+    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+]
+
+###
+
