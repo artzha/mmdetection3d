@@ -1,12 +1,11 @@
+"""
+Evaluate on KITTI
+"""
 # _base_ = [
 #     '../_base_/models/hv_pointpillars_secfpn_kitti.py',
 #     '../_base_/datasets/kitti-3d-3class.py',
 #     '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
 # ]
-
-"""
-Evaluate on KITTI
-"""
 # point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1]
 # # dataset settings
 # data_root = 'data/kitti/'
@@ -82,6 +81,11 @@ db_sampler = dict(
         file_client_args=file_client_args),
     file_client_args=file_client_args)
 
+_base_ = [
+    '../_base_/models/hv_pointpillars_secfpn_kitti.py',
+    '../_base_/datasets/nus-3d-3class.py',
+    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+]
 """"""
 
 # PointPillars uses different augmentation hyper parameters
@@ -158,14 +162,3 @@ runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=20)
-
-
-###Uncomment Below to eval on nuscenes
-_base_ = [
-    '../_base_/models/hv_pointpillars_secfpn_kitti.py',
-    '../_base_/datasets/nus-3d-3class.py',
-    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
-]
-
-###
-

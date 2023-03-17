@@ -357,7 +357,7 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
     split_parts = get_split_parts(num_examples, num_parts)
     parted_overlaps = []
     example_idx = 0
-
+    
     for num_part in split_parts:
         gt_annos_part = gt_annos[example_idx:example_idx + num_part]
         dt_annos_part = dt_annos[example_idx:example_idx + num_part]
@@ -372,29 +372,29 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
                 [a['dimensions'][:, [0, 2]] for a in gt_annos_part], 0)
             rots = np.concatenate([a['rotation_y'] for a in gt_annos_part], 0)
             gt_boxes = np.concatenate([loc, dims, rots[..., np.newaxis]],
-                                      axis=1)
+                                    axis=1)
             loc = np.concatenate(
                 [a['location'][:, [0, 2]] for a in dt_annos_part], 0)
             dims = np.concatenate(
                 [a['dimensions'][:, [0, 2]] for a in dt_annos_part], 0)
             rots = np.concatenate([a['rotation_y'] for a in dt_annos_part], 0)
             dt_boxes = np.concatenate([loc, dims, rots[..., np.newaxis]],
-                                      axis=1)
+                                    axis=1)
             overlap_part = bev_box_overlap(gt_boxes,
-                                           dt_boxes).astype(np.float64)
+                                        dt_boxes).astype(np.float64)
         elif metric == 2:
             loc = np.concatenate([a['location'] for a in gt_annos_part], 0)
             dims = np.concatenate([a['dimensions'] for a in gt_annos_part], 0)
             rots = np.concatenate([a['rotation_y'] for a in gt_annos_part], 0)
             gt_boxes = np.concatenate([loc, dims, rots[..., np.newaxis]],
-                                      axis=1)
+                                    axis=1)
             loc = np.concatenate([a['location'] for a in dt_annos_part], 0)
             dims = np.concatenate([a['dimensions'] for a in dt_annos_part], 0)
             rots = np.concatenate([a['rotation_y'] for a in dt_annos_part], 0)
             dt_boxes = np.concatenate([loc, dims, rots[..., np.newaxis]],
-                                      axis=1)
+                                    axis=1)
             overlap_part = d3_box_overlap(gt_boxes,
-                                          dt_boxes).astype(np.float64)
+                                        dt_boxes).astype(np.float64)
         else:
             raise ValueError('unknown metric')
         parted_overlaps.append(overlap_part)
@@ -678,29 +678,50 @@ def kitti_eval(gt_annos,
     assert len(eval_types) > 0, 'must contain at least one evaluation type'
     if 'aos' in eval_types:
         assert 'bbox' in eval_types, 'must evaluate bbox when evaluating aos'
-    overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7,
-                             0.5], [0.7, 0.5, 0.5, 0.7, 0.5],
+    overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5], 
+                            [0.7, 0.5, 0.5, 0.7, 0.5],
                             [0.7, 0.5, 0.5, 0.7, 0.5]])
     overlap_0_5 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5],
                             [0.5, 0.25, 0.25, 0.5, 0.25],
                             [0.5, 0.25, 0.25, 0.5, 0.25]])
     min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
     print("Current classes ", current_classes)
-
-    #Waymo ClassRemap
+    
+    #Waymo model->KITTI dataset ClassRemap
     # dt_to_gt_class_map = {
     #     'Pedestrian': 'Car',
     #     'Cyclist': 'Pedestrian',
     #     'Car' :'Cyclist'
     # }
-    #nuScenes ClassRemap
+
+    #nuScenes model->KITTI dataset ClassRemap
+    # dt_to_gt_class_map = {
+    #     'Pedestrian': 'Car',
+    #     'Cyclist': 'Cyclist',
+    #     'Car' :'Pedestrian'
+    # }
+    
+    #KITTI model->KITTI dataset ClassRemap
+    # dt_to_gt_class_map = {
+    #     'Pedestrian': 'Pedestrian',
+    #     'Cyclist': 'Cyclist',
+    #     'Car' :'Car'
+    # }
+
+    #KITTI model ->nuScenes dataset Classremapc
+    # dt_to_gt_class_map = {
+    #     'pedestrian': 'car', 
+    #     'bicycle': 'bicycle', 
+    #     'car': 'pedestrian'
+    # }
+
     dt_to_gt_class_map = {
-        'Pedestrian': 'Car',
-        'Cyclist': 'Cyclist',
-        'Car' :'Pedestrian'
+        'pedestrian': 'pedestrian',
+        'bicycle': 'bicycle',
+        'car': 'car'
     }
+
     #Remap all det classes using waymo class remap
-    # import pdb; pdb.set_trace()
     for anno_idx, anno in enumerate(dt_annos):
         anno_names = anno['name']
         for name_idx, name in enumerate(anno_names):
@@ -710,14 +731,21 @@ def kitti_eval(gt_annos,
             except Exception as e:
                 print("Erroneous class name given")
                 import pdb; pdb.set_trace()
-    class_to_name = {
-        0: 'Car',
-        1: 'Pedestrian',
-        2: 'Cyclist',
-        3: 'Van',
-        4: 'Person_sitting',
-    }
 
+    # Use standard kitti IOU overlap metrics
+    class_to_name = { #nuscenes
+        0: 'car',
+        1: 'pedestrian',
+        2: 'bicycle',
+    }
+    # class_to_name = {
+    #     0: 'Car',
+    #     1: 'Pedestrian',
+    #     2: 'Cyclist',
+    #     3: 'Van',
+    #     4: 'Person_sitting',
+    # }
+    # import pdb; pdb.set_trace()
     name_to_class = {v: n for n, v in class_to_name.items()}
 
     if not isinstance(current_classes, (list, tuple)):
@@ -729,7 +757,6 @@ def kitti_eval(gt_annos,
         else:
             current_classes_int.append(curcls)
     current_classes = current_classes_int
-    # import pdb; pdb.set_trace()
 
     min_overlaps = min_overlaps[:, :, current_classes]
     result = ''
@@ -779,7 +806,7 @@ def kitti_eval(gt_annos,
             if mAP11_3d is not None:
                 result += '3d   AP11:{:.4f}, {:.4f}, {:.4f}\n'.format(
                     *mAP11_3d[j, :, i])
-            if compute_aos:
+            if compute_aos and mAP11_aos is not None:
                 result += 'aos  AP11:{:.2f}, {:.2f}, {:.2f}\n'.format(
                     *mAP11_aos[j, :, i])
 
@@ -816,7 +843,7 @@ def kitti_eval(gt_annos,
             mAP11_3d = mAP11_3d.mean(axis=0)
             result += '3d   AP11:{:.4f}, {:.4f}, {:.4f}\n'.format(*mAP11_3d[:,
                                                                             0])
-        if compute_aos:
+        if compute_aos and mAP11_aos is not None:
             mAP11_aos = mAP11_aos.mean(axis=0)
             result += 'aos  AP11:{:.2f}, {:.2f}, {:.2f}\n'.format(
                 *mAP11_aos[:, 0])
@@ -852,7 +879,7 @@ def kitti_eval(gt_annos,
             if mAP40_3d is not None:
                 result += '3d   AP40:{:.4f}, {:.4f}, {:.4f}\n'.format(
                     *mAP40_3d[j, :, i])
-            if compute_aos:
+            if compute_aos and mAP40_aos is not None:
                 result += 'aos  AP40:{:.2f}, {:.2f}, {:.2f}\n'.format(
                     *mAP40_aos[j, :, i])
 
@@ -889,7 +916,7 @@ def kitti_eval(gt_annos,
             mAP40_3d = mAP40_3d.mean(axis=0)
             result += '3d   AP40:{:.4f}, {:.4f}, {:.4f}\n'.format(*mAP40_3d[:,
                                                                             0])
-        if compute_aos:
+        if compute_aos and mAP40_aos is not None:
             mAP40_aos = mAP40_aos.mean(axis=0)
             result += 'aos  AP40:{:.2f}, {:.2f}, {:.2f}\n'.format(
                 *mAP40_aos[:, 0])

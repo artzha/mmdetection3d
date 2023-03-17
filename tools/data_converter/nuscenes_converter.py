@@ -12,7 +12,6 @@ from pyquaternion import Quaternion
 from shapely.geometry import MultiPoint, box
 
 from mmdet3d.core.bbox import points_cam2img
-from mmdet3d.datasets import NuScenesDataset
 
 nus_categories = ('car', 'truck', 'trailer', 'bus', 'construction_vehicle',
                   'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
@@ -161,6 +160,7 @@ def _fill_trainval_infos(nusc,
         tuple[list[dict]]: Information of training set and validation set
             that will be saved to the info file.
     """
+    from mmdet3d.datasets import NuScenesDataset
     train_nusc_infos = []
     val_nusc_infos = []
 
@@ -589,6 +589,7 @@ def generate_record(ann_rec: dict, x1: float, y1: float, x2: float, y2: float,
             - bbox (list[float]): left x, top y, dx, dy of 2d box
             - iscrowd (int): whether the area is crowd
     """
+    from mmdet3d.datasets import NuScenesDataset
     repro_rec = OrderedDict()
     repro_rec['sample_data_token'] = sample_data_token
     coco_rec = dict()

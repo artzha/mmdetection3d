@@ -105,7 +105,7 @@ class Base3DDetector(BaseDetector):
                 mask = result[batch_id]['scores_3d'] > score_thr
                 pred_bboxes = pred_bboxes[mask]
                 pred_labels = pred_labels[mask]
-
+            import pdb; pdb.set_trace()
             # for now we convert points and bbox into depth mode
             if (box_mode_3d == Box3DMode.CAM) or (box_mode_3d
                                                   == Box3DMode.LIDAR):
