@@ -587,7 +587,7 @@ class NuScenesDataset(Custom3DDataset):
         ]
         return Compose(pipeline)
 
-    def show(self, results, out_dir, show=False, pipeline=None):
+    def show(self, results, out_dir, show=True, pipeline=None):
         """Results visualization.
 
         Args:
