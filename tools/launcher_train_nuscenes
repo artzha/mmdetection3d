@@ -1,0 +1,2 @@
+ibrun -n 1 -o 0 task_affinity singularity exec --nv docker://artzha/mmdetection3d:latest bash tools/dist_train.sh ${CONFIG_NUSCENES} ${NUM_GPUS} --work-dir ${NUSCENES_WORK_DIR} --resume-from ${NUSCENES_RESUME_CKPT} >> launcher_train_models_task${LAUNCHER_TSK_ID} &
+wait
