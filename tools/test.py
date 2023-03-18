@@ -226,20 +226,20 @@ def main():
         model.PALETTE = dataset.PALETTE
 
     # Use cached results if requested for outputs
-    if args.eval[0]!="kitti":
-        if not distributed:
-            model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-            outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
-        else:
-            model = MMDistributedDataParallel(
-                model.cuda(),
-                device_ids=[torch.cuda.current_device()],
-                broadcast_buffers=False)
-            outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                                    args.gpu_collect)
+    # if args.eval[0]=="kitti":
+    if not distributed:
+        model = MMDataParallel(model, device_ids=cfg.gpu_ids)
+        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
     else:
-        print("Loading predictions from %s" % args.out)
-        outputs = mmcv.load(args.out)
+        model = MMDistributedDataParallel(
+            model.cuda(),
+            device_ids=[torch.cuda.current_device()],
+            broadcast_buffers=False)
+        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
+                                args.gpu_collect)
+    # else:
+    #     print("Loading predictions from %s" % args.out)
+    #     outputs = mmcv.load(args.out)
 
 
     rank, _ = get_dist_info()

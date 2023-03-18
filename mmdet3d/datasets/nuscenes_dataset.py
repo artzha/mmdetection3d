@@ -519,7 +519,7 @@ class NuScenesDataset(Custom3DDataset):
             #Format nuscenes annotation format to kitti style
             kitti_data_infos = self.format_kitti_data_infos_annos(self.data_infos)
             gt_annos = kitti_data_infos
-            import pdb; pdb.set_trace()
+
             if isinstance(result_files, dict):
                 ap_dict = dict()
                 for name, result_files_ in result_files.items():
