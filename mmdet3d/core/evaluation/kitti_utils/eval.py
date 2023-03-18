@@ -736,13 +736,13 @@ def kitti_eval(gt_annos,
         'Car': 'Pedestrian'
     }
 
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     # dt_to_gt_class_map = {
     #     'pedestrian': 'pedestrian',
     #     'bicycle': 'bicycle',
     #     'car': 'car'
     # }
-
+    # import pdb; pdb.set_trace()
     #Remap all det classes using waymo class remap
     for anno_idx, anno in enumerate(dt_annos):
         anno_names = anno['name']
@@ -755,18 +755,18 @@ def kitti_eval(gt_annos,
                 import pdb; pdb.set_trace()
 
     # Use standard kitti IOU overlap metrics
-    class_to_name = { #nuscenes
-        0: 'car',
-        1: 'pedestrian',
-        2: 'bicycle',
-    }
-    # class_to_name = {
-    #     0: 'Car',
-    #     1: 'Pedestrian',
-    #     2: 'Cyclist',
-    #     3: 'Van',
-    #     4: 'Person_sitting',
+    # class_to_name = { #nuscenes
+    #     0: 'car',
+    #     1: 'pedestrian',
+    #     2: 'bicycle',
     # }
+    class_to_name = {
+        0: 'Car',
+        1: 'Pedestrian',
+        2: 'Cyclist',
+        3: 'Van',
+        4: 'Person_sitting',
+    }
     # import pdb; pdb.set_trace()
     name_to_class = {v: n for n, v in class_to_name.items()}
 
