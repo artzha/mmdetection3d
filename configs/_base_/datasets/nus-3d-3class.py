@@ -4,7 +4,7 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 # For nuScenes we do 3 class detection for zero shot
 class_names = [
     'car', 'bicycle', 'pedestrian'
-]
+]#this list determines the class index
 
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/'

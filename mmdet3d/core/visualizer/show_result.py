@@ -97,7 +97,6 @@ def show_result(points,
     """
     result_path = osp.join(out_dir, filename)
     mmcv.mkdir_or_exist(result_path)
-
     if show:
         from .open3d_vis import Visualizer
 

@@ -4,15 +4,25 @@ from os import path as osp
 
 import mmcv
 import numpy as np
+import torch
 import pyquaternion
+from nuscenes.utils.geometry_utils import view_points
 from nuscenes.utils.data_classes import Box as NuScenesBox
 
+from mmcv.utils import print_log
+
+from ..core.bbox import Box3DMode, points_cam2img
 from ..core import show_result
 from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
 from .builder import DATASETS
 from .custom_3d import Custom3DDataset
 from .pipelines import Compose
 
+CLASS_INDEX_MAP = {
+    'car': 0,
+    "bicycle": 1,
+    'pedestrian': 2
+}
 
 @DATASETS.register_module()
 class NuScenesDataset(Custom3DDataset):
@@ -150,6 +160,7 @@ class NuScenesDataset(Custom3DDataset):
                 use_map=False,
                 use_external=False,
             )
+        self.pcd_limit_range=[-50, -50, -5, 50, 50, 3]
 
     def get_cat_ids(self, idx):
         """Get category distribution of single scene.
@@ -502,18 +513,18 @@ class NuScenesDataset(Custom3DDataset):
         """
         
         if 'kitti' in metric:
-            result_files, tmp_dir = self.format_results(
-                results,
-                pklfile_prefix,
-                submission_prefix,
-                data_format='kitti')
+            result_files, tmp_dir = self.format_kitti_results(results, jsonfile_prefix)
             from mmdet3d.core.evaluation import kitti_eval
-            gt_annos = [info['annos'] for info in self.data_infos]
+
+            #Format nuscenes annotation format to kitti style
+            kitti_data_infos = self.format_kitti_data_infos_annos(self.data_infos)
+            gt_annos = kitti_data_infos
 
             if isinstance(result_files, dict):
                 ap_dict = dict()
                 for name, result_files_ in result_files.items():
                     eval_types = ['bev', '3d']
+                    
                     ap_result_str, ap_dict_ = kitti_eval(
                         gt_annos,
                         result_files_,
@@ -576,7 +587,7 @@ class NuScenesDataset(Custom3DDataset):
         ]
         return Compose(pipeline)
 
-    def show(self, results, out_dir, show=False, pipeline=None):
+    def show(self, results, out_dir, show=True, pipeline=None):
         """Results visualization.
 
         Args:
@@ -608,6 +619,368 @@ class NuScenesDataset(Custom3DDataset):
                                                  Box3DMode.DEPTH)
             show_result(points, show_gt_bboxes, show_pred_bboxes, out_dir,
                         file_name, show)
+            
+    """
+    ADDED TO FORMAT NUSCENES TO KITTI
+    """
+    def format_kitti_data_infos_annos(self, data_infos, data_format='kitti'):
+        annos_dict = []
+        # Contents of each entry in annos_dict
+        # {
+        #     'name': [],         #name
+        #     'truncated': [],    #truneated  (0 is assummed)
+        #     'occluded': [],     #occluded (not available assummed to be clear)
+        #     'alpha': [],
+        #     'bbox': [],         # 2D bbox
+        #     'dimensions': [],
+        #     'location': [], 
+        #     'rotation_y': [],
+        #     'score': [],
+        #     'index': [],
+        #     'difficulty': [],
+        #     'num_points_in_gt': []
+        # }
+
+        """
+        Refer to the code snippet below for converting bboxes from nusc to kitti format
+        https://github.com/cxy1997/3D_adapt_auto_driving/blob/8508e0bb98142c339898a14a7adef557a921b7ba/convert/nusc2kitti.py#L328
+        
+        The relation between nuscenes and kitti coordinates is note worthy:
+            1. The coordinate conventino for nuscenes is  
+        """
+        imsize = (1600, 900)
+        for sample_idx, infos in enumerate(data_infos):
+            num_samples = len(infos['gt_names'])
+            tmp_anno_dict = {}
+            tmp_anno_dict['name']             = np.array([])
+            tmp_anno_dict['truncated']        = np.array([])
+            tmp_anno_dict['occluded']         = np.array([])
+            tmp_anno_dict['score']            = np.array([])
+            tmp_anno_dict['difficulty']       = np.array([])
+            tmp_anno_dict['num_points_in_gt'] = np.array([])
+
+            tmp_anno_dict['bbox']       = np.empty((0, 4))
+            tmp_anno_dict['location']   = np.empty((0, 3))
+            tmp_anno_dict['dimensions'] = np.empty((0, 3))
+            tmp_anno_dict['alpha']      = np.array([])
+            tmp_anno_dict['rotation_y'] = np.array([])
+            tmp_anno_dict['index']      = np.array([])
+
+            #Convert boxes from BOX format to LiDARInstance3DBoxes
+            gt_boxes_lidar =  LiDARInstance3DBoxes(
+                    infos['gt_boxes'],
+                    box_dim=infos['gt_boxes'].shape[-1],
+                    origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
+
+            # """Reference: https://github.com/nutonomy/nuscenes-devkit/blob/master/python-sdk/nuscenes/scripts/export_kitti.py"""
+            rect = pyquaternion.Quaternion(axis=[1, 0, 0], angle=0).rotation_matrix.astype(np.float32) # Camera is already rectified
+            p_left_kitti = np.zeros((3, 4))
+            p_left_kitti[:3, :3] = infos['cams']['CAM_FRONT']['cam_intrinsic']  # Cameras are always rectified.
+            P0 = p_left_kitti.astype(np.float32)
+            P0 = gt_boxes_lidar.tensor.new_tensor(P0)
+
+            velo_to_cam_rot = infos['cams']['CAM_FRONT']['sensor2lidar_rotation']
+            velo_to_cam_trans = infos['cams']['CAM_FRONT']['sensor2lidar_translation']
+            Trv2c = np.hstack((velo_to_cam_rot, velo_to_cam_trans.reshape(3, 1)))
+            """"""
+
+            gt_boxes_camera = gt_boxes_lidar.convert_to(Box3DMode.CAM, rect @ Trv2c)
+
+            box_corners = gt_boxes_camera.corners
+            box_corners_in_image = points_cam2img(box_corners, P0)
+            # box_corners_in_image: [N, 8, 2]
+            minxy = torch.min(box_corners_in_image, dim=1)[0]
+            maxxy = torch.max(box_corners_in_image, dim=1)[0]
+            box_2d_preds = torch.cat([minxy, maxxy], dim=1)
+            # Post-processing
+            # check box_preds
+            limit_range = gt_boxes_lidar.tensor.new_tensor(self.pcd_limit_range)
+            valid_pcd_inds = ((gt_boxes_lidar.center > limit_range[:3]) &
+                            (gt_boxes_lidar.center < limit_range[3:]))
+            valid_inds = valid_pcd_inds.all(-1)
+
+            for box_idx in range(len(valid_inds)):
+                if valid_inds[box_idx]==0:
+                    continue
+                gt_box_center   = gt_boxes_camera[box_idx].center.numpy().reshape(-1,)
+                gt_box_dim      = gt_boxes_camera[box_idx].dims.numpy().reshape(-1,)
+                gt_box_rot_y    = -gt_boxes_camera[box_idx].yaw.numpy().reshape(-1,) #invert sign to for flipped z from lidar to camera frames
+                #TODO: add in 2d bbox projection
+                box_x, box_y, rot_y = gt_box_center[0], gt_box_center[2], gt_box_rot_y
+                alpha = -np.arctan2(box_x,box_y) + rot_y
+
+                tmp_anno_dict['name']       = np.append(tmp_anno_dict['name'], infos['gt_names'][box_idx])
+                tmp_anno_dict['truncated']  = np.append(tmp_anno_dict['truncated'], 0.0)
+                tmp_anno_dict['occluded']   = np.append(tmp_anno_dict['occluded'], 0)
+                tmp_anno_dict['score']      = np.append(tmp_anno_dict['score'], 0)
+                tmp_anno_dict['difficulty'] = np.append(tmp_anno_dict['difficulty'], -1)
+                tmp_anno_dict['num_points_in_gt']   = np.append(tmp_anno_dict['num_points_in_gt'], infos['num_lidar_pts'][box_idx])
+
+                tmp_anno_dict['bbox']           = np.vstack( (tmp_anno_dict['bbox'], box_2d_preds[box_idx, :].numpy() ))
+                tmp_anno_dict['alpha']          = np.append(tmp_anno_dict['alpha'], alpha)
+
+                tmp_anno_dict['location']       = np.vstack((tmp_anno_dict['location'],  gt_box_center))
+                tmp_anno_dict['dimensions']     = np.vstack((tmp_anno_dict['dimensions'], gt_box_dim))
+                tmp_anno_dict['rotation_y']     = np.append(tmp_anno_dict['rotation_y'], gt_box_rot_y)
+
+                class_idx = -1
+                if infos['gt_names'][box_idx] in CLASS_INDEX_MAP:
+                    class_idx = CLASS_INDEX_MAP[infos['gt_names'][box_idx]]
+                tmp_anno_dict['index'] = np.append(tmp_anno_dict['index'], class_idx)
+            annos_dict.append(tmp_anno_dict)
+        return annos_dict
+
+    def format_kitti_results(self,
+                       outputs,
+                       pklfile_prefix=None,
+                       submission_prefix=None,
+                       data_format='waymo'):
+        """Format the results to pkl file.
+
+        Args:
+            outputs (list[dict]): Testing results of the dataset.
+            pklfile_prefix (str): The prefix of pkl files. It includes
+                the file path and the prefix of filename, e.g., "a/b/prefix".
+                If not specified, a temp file will be created. Default: None.
+            submission_prefix (str): The prefix of submitted files. It
+                includes the file path and the prefix of filename, e.g.,
+                "a/b/prefix". If not specified, a temp file will be created.
+                Default: None.
+            data_format (str, optional): Output data format.
+                Default: 'waymo'. Another supported choice is 'kitti'.
+
+        Returns:
+            tuple: (result_files, tmp_dir), result_files is a dict containing
+                the json filepaths, tmp_dir is the temporal directory created
+                for saving json files when jsonfile_prefix is not specified.
+        """
+        if pklfile_prefix is None:
+            tmp_dir = tempfile.TemporaryDirectory()
+            pklfile_prefix = osp.join(tmp_dir.name, 'results')
+        else:
+            tmp_dir = None
+
+        assert ('waymo' in data_format or 'kitti' in data_format), \
+            f'invalid data_format {data_format}'
+
+        if (not isinstance(outputs[0], dict)) or 'img_bbox' in outputs[0]:
+            raise TypeError('Not supported type for reformat results.')
+        elif 'pts_bbox' in outputs[0]:
+            result_files = dict()
+            for name in outputs[0]:
+                results_ = [out[name] for out in outputs]
+                pklfile_prefix_ = pklfile_prefix + name
+                if submission_prefix is not None:
+                    submission_prefix_ = f'{submission_prefix}_{name}'
+                else:
+                    submission_prefix_ = None
+                result_files_ = self.bbox2result_kitti(results_, self.CLASSES,
+                                                       pklfile_prefix_,
+                                                       submission_prefix_)
+                result_files[name] = result_files_
+        else:
+            result_files = self.bbox2result_kitti(outputs, self.CLASSES,
+                                                  pklfile_prefix,
+                                                  submission_prefix)
+        return result_files, tmp_dir
+            
+    def bbox2result_kitti(self,
+                          net_outputs,
+                          class_names,
+                          pklfile_prefix=None,
+                          submission_prefix=None):
+        """Convert results to kitti format for evaluation and test submission.
+
+        Args:
+            net_outputs (List[np.ndarray]): list of array storing the
+                bbox and score
+            class_nanes (List[String]): A list of class names
+            pklfile_prefix (str): The prefix of pkl file.
+            submission_prefix (str): The prefix of submission file.
+
+        Returns:
+            List[dict]: A list of dict have the kitti 3d format
+        """
+        assert len(net_outputs) == len(self.data_infos), \
+            'invalid list length of network outputs'
+        if submission_prefix is not None:
+            mmcv.mkdir_or_exist(submission_prefix)
+
+        det_annos = []
+        print('\nConverting prediction to KITTI format')
+        for idx, pred_dicts in enumerate(
+                mmcv.track_iter_progress(net_outputs)):
+            annos = []
+            info = self.data_infos[idx]
+
+            sample_idx = idx
+            image_shape = (1600, 900)
+
+            box_dict = self.convert_valid_bboxes(pred_dicts, info, sample_idx)
+            if len(box_dict['bbox']) > 0:
+                box_2d_preds = box_dict['bbox']
+                box_preds = box_dict['box3d_camera']
+                scores = box_dict['scores']
+                box_preds_lidar = box_dict['box3d_lidar']
+                label_preds = box_dict['label_preds']
+
+                anno = {
+                    'name':         [],
+                    'truncated':    [],
+                    'occluded':     [],
+                    'alpha':        [],
+                    'bbox':         [],
+                    'dimensions':   [],
+                    'location':     [],
+                    'rotation_y':   [],
+                    'score':        []
+                }
+
+                for box, box_lidar, bbox, score, label in zip(
+                        box_preds, box_preds_lidar, box_2d_preds, scores,
+                        label_preds):
+                    bbox[2:] = np.minimum(bbox[2:], image_shape[::-1])
+                    bbox[:2] = np.maximum(bbox[:2], [0, 0])
+                    anno['name'].append(class_names[int(label)])
+                    anno['truncated'].append(0.0)
+                    anno['occluded'].append(0)
+                    anno['alpha'].append(
+                        -np.arctan2(-box_lidar[1], box_lidar[0]) + box[6])
+                    anno['bbox'].append(bbox)
+                    anno['dimensions'].append(box[3:6])
+                    anno['location'].append(box[:3])
+                    anno['rotation_y'].append(box[6])
+                    anno['score'].append(score)
+                
+                anno = {k: np.stack(v) for k, v in anno.items()}
+                annos.append(anno)
+
+                if submission_prefix is not None:
+                    curr_file = f'{submission_prefix}/{sample_idx:07d}.txt'
+                    with open(curr_file, 'w') as f:
+                        bbox = anno['bbox']
+                        loc = anno['location']
+                        dims = anno['dimensions']  # lhw -> hwl
+
+                        for idx in range(len(bbox)):
+                            print(
+                                '{} -1 -1 {:.4f} {:.4f} {:.4f} {:.4f} '
+                                '{:.4f} {:.4f} {:.4f} '
+                                '{:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}'.
+                                format(anno['name'][idx], anno['alpha'][idx],
+                                       bbox[idx][0], bbox[idx][1],
+                                       bbox[idx][2], bbox[idx][3],
+                                       dims[idx][1], dims[idx][2],
+                                       dims[idx][0], loc[idx][0], loc[idx][1],
+                                       loc[idx][2], anno['rotation_y'][idx],
+                                       anno['score'][idx]),
+                                file=f)
+            else:
+                annos.append({
+                    'name': np.array([]),
+                    'truncated': np.array([]),
+                    'occluded': np.array([]),
+                    'alpha': np.array([]),
+                    'bbox': np.zeros([0, 4]),
+                    'dimensions': np.zeros([0, 3]),
+                    'location': np.zeros([0, 3]),
+                    'rotation_y': np.array([]),
+                    'score': np.array([]),
+                })
+            annos[-1]['sample_idx'] = np.array(
+                [sample_idx] * len(annos[-1]['score']), dtype=np.int64)
+
+            det_annos += annos
+
+        if pklfile_prefix is not None:
+            if not pklfile_prefix.endswith(('.pkl', '.pickle')):
+                out = f'{pklfile_prefix}.pkl'
+            mmcv.dump(det_annos, out)
+            print(f'Result is saved to {out}.')
+
+        return det_annos
+
+    def convert_valid_bboxes(self, box_dict, info, sample_idx=-1):
+        """Convert the boxes into valid format.
+
+        Args:
+            box_dict (dict): Bounding boxes to be converted.
+
+                - boxes_3d (:obj:``LiDARInstance3DBoxes``): 3D bounding boxes.
+                - scores_3d (np.ndarray): Scores of predicted boxes.
+                - labels_3d (np.ndarray): Class labels of predicted boxes.
+            info (dict): Dataset information dictionary.
+
+        Returns:
+            dict: Valid boxes after conversion.
+
+                - bbox (np.ndarray): 2D bounding boxes (in camera 0).
+                - box3d_camera (np.ndarray): 3D boxes in camera coordinates.
+                - box3d_lidar (np.ndarray): 3D boxes in lidar coordinates.
+                - scores (np.ndarray): Scores of predicted boxes.
+                - label_preds (np.ndarray): Class labels of predicted boxes.
+                - sample_idx (np.ndarray): Sample index.
+        """
+        # TODO: refactor this function
+        box_preds = box_dict['boxes_3d']
+        scores = box_dict['scores_3d']
+        labels = box_dict['labels_3d']
+        box_preds.limit_yaw(offset=0.5, period=np.pi * 2)
+
+        if len(box_preds) == 0:
+            return dict(
+                bbox=np.zeros([0, 4]),
+                box3d_camera=np.zeros([0, 7]),
+                box3d_lidar=np.zeros([0, 7]),
+                scores=np.zeros([0]),
+                label_preds=np.zeros([0, 4]),
+                sample_idx=sample_idx)
+        
+        # """Reference: https://github.com/nutonomy/nuscenes-devkit/blob/master/python-sdk/nuscenes/scripts/export_kitti.py"""
+        rect = pyquaternion.Quaternion(axis=[1, 0, 0], angle=0).rotation_matrix.astype(np.float32) # Camera is already rectified
+        p_left_kitti = np.zeros((3, 4))
+        p_left_kitti[:3, :3] = self.data_infos[sample_idx]['cams']['CAM_FRONT']['cam_intrinsic']  # Cameras are always rectified.
+        P0 = p_left_kitti.astype(np.float32)
+        P0 = box_preds.tensor.new_tensor(P0)
+
+        velo_to_cam_rot = self.data_infos[sample_idx]['cams']['CAM_FRONT']['sensor2lidar_rotation']
+        velo_to_cam_trans = self.data_infos[sample_idx]['cams']['CAM_FRONT']['sensor2lidar_translation']
+        Trv2c = np.hstack((velo_to_cam_rot, velo_to_cam_trans.reshape(3, 1)))
+        """"""
+
+        box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
+
+        box_corners = box_preds_camera.corners
+        box_corners_in_image = points_cam2img(box_corners, P0)
+        # box_corners_in_image: [N, 8, 2]
+        minxy = torch.min(box_corners_in_image, dim=1)[0]
+        maxxy = torch.max(box_corners_in_image, dim=1)[0]
+        box_2d_preds = torch.cat([minxy, maxxy], dim=1)
+        # Post-processing
+        # check box_preds
+        limit_range = box_preds.tensor.new_tensor(self.pcd_limit_range)
+        valid_pcd_inds = ((box_preds.center > limit_range[:3]) &
+                          (box_preds.center < limit_range[3:]))
+        valid_inds = valid_pcd_inds.all(-1)
+
+        if valid_inds.sum() > 0:
+            return dict(
+                bbox=box_2d_preds[valid_inds, :].numpy(),
+                box3d_camera=box_preds_camera[valid_inds].tensor.numpy(),
+                box3d_lidar=box_preds[valid_inds].tensor.numpy(),
+                scores=scores[valid_inds].numpy(),
+                label_preds=labels[valid_inds].numpy(),
+                sample_idx=sample_idx,
+            )
+        else:
+            return dict(
+                bbox=np.zeros([0, 4]),
+                box3d_camera=np.zeros([0, 7]),
+                box3d_lidar=np.zeros([0, 7]),
+                scores=np.zeros([0]),
+                label_preds=np.zeros([0, 4]),
+                sample_idx=sample_idx,
+            )
 
 
 def output_to_nusc_box(detection, with_velocity=True):
