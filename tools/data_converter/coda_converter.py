@@ -4,11 +4,16 @@ r"""Adapted from `Waymo to KITTI converter
 """
 
 from glob import glob
+import os
+import json
 from os.path import join
+import sys
+sys.path.append("/robodata/arthurz/Research/coda")
 
 import mmcv
 import numpy as np
-import tensorflow as tf
+
+from helpers.sensors import get_filename_info
 
 
 class CODa2KITTI(object):
@@ -29,44 +34,87 @@ class CODa2KITTI(object):
                  save_dir,
                  prefix,
                  workers=64,
+                 split="train",
                  test_mode=False):
         self.filter_empty_3dboxes = True
         self.filter_no_label_zone_points = True
 
-        self.selected_coda_classes = ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
-
-        # turn on eager execution for older tensorflow versions
-        if int(tf.__version__.split('.')[0]) < 2:
-            tf.enable_eager_execution()
+        self.selected_coda_classes = ['VEHICLE', 'PEDESTRIAN', 'BIKE']
 
         self.lidar_list = [
             'os1'
         ]
         self.type_list = [
-            'BIKE',
-            'VEHICLE', 
-            'PERSON', 
-            'TREE', 
-            'POLE',  
-            'CHAIR', 
-            'TABLE', 
-            'OTHER' 
+            'PEDESTRIAN',
+            'CAR', 
+            'BIKE', 
+            'HORSE', 
+            'PICKUP TRUCK',  
+            'DELIVERY TRUCK', 
+            'SERVICE VEHICLE', 
+            'UTILITY VEHICLE',
+            'SCOOTER',
+            'MOTORCYCLE',
+            'FIRE HYDRANT',
+            'FIRE ALARM',
+            'PARKING KIOSK',
+            'MAILBOX',
+            'NEWSPAPER DISPENSER',
+            'SANITIZER DISPENSER',
+            'CONDIMENT DISPENSER',
+            'ATM',
+            'VENDING MACHINE',
+            'DOOR SWITCH',
+            'EMERGENCY AID KIT',
+            'COMPUTER',
+            'TELEVISION',
+            'DUMPSTER',
+            'TRASH CAN',
+            'VACUUM CLEANER',
+            'CART',
+            'CHAIR',
+            'COUCH',
+            'BENCH',
+            'TABLE',
+            'BOLLARD',
+            'CONSTRUCTION BARRIER',
+            'FENCE',
+            'RAILING',
+            'CONE',
+            'STANCHION',
+            'TRAFFIC LIGHT',
+            'TRAFFIC SIGN',
+            'TRAFFIC ARM',
+            'CANOPY',
+            'BIKE RACK',
+            'POLE',
+            'INFORMATIONAL SIGN',
+            'WALL SIGN',
+            'DOOR',
+            'FLOOR SIGN',
+            'ROOM LABEL',
+            'FREESTANDING PLANT',
+            'TREE',
+            'OTHER'
         ]
         self.coda_to_kitti_class_map = {
-            'Other': 'DontCare',
-            'PERSON': 'Pedestrian',
-            'VEHICLE': 'Car',
+            'OTHER': 'DontCare',
+            'PEDESTRIAN': 'Pedestrian',
+            'CAR': 'Car',
             'BIKE': 'Cyclist',
+            #BELOW NOT FOUND IN KITTI
             'TREE': 'Tree',
             'POLE': 'Pole',
             'CHAIR': 'Chair',
-            'TABLE': 'Table'
+            'TABLE': 'Table',
+            'RAILING': 'Railing'
         }
 
         self.load_dir = load_dir
-        self.save_dir = save_dir
+        self.save_dir = join(save_dir, split)
         self.prefix = prefix
         self.workers = int(workers)
+        self.split = split
         self.test_mode = test_mode
 
         self.label_save_dir = f'{self.save_dir}/label_'
@@ -77,7 +125,23 @@ class CODa2KITTI(object):
         self.pose_save_dir = f'{self.save_dir}/pose'
         self.timestamp_save_dir = f'{self.save_dir}/timestamp'
 
+        self.sample_files = []
+
+        self.process_metadata()
         self.create_folder()
+
+    def process_metadata(self):
+        metadata_path = join(self.load_dir, "metadata")
+        assert os.path.exists(metadata_path), "Metadata directory %s does not exist" % metadata_path
+
+        metadata_files = glob("%s/*.json" % metadata_path)
+        metadata_files = sorted(metadata_files, key=lambda fname: int(fname.split('/')[-1].split('.')[0]) )
+
+        for mfile in metadata_files:
+            assert os.path.isfile(mfile), '%s does not exist' % mfile
+            meta_json = json.load(open(mfile, "r"))
+
+            self.sample_files.extend(meta_json["ObjectTracking"][self.split])
 
     def convert(self):
         """Convert action."""
@@ -91,30 +155,22 @@ class CODa2KITTI(object):
         Args:
             file_idx (int): Index of the file to be converted.
         """
-        pathname = self.tfrecord_pathnames[file_idx]
-        dataset = tf.data.TFRecordDataset(pathname, compression_type='')
+        pathname = self.sample_files[file_idx]
+        print(get_filename_info(pathname))
 
-        for frame_idx, data in enumerate(dataset):
 
-            frame = dataset_pb2.Frame()
-            frame.ParseFromString(bytearray(data.numpy()))
-            if (self.selected_waymo_locations is not None
-                    and frame.context.stats.location
-                    not in self.selected_waymo_locations):
-                continue
+        # self.save_image(frame, file_idx, frame_idx)
+        # self.save_calib(frame, file_idx, frame_idx)
+        # self.save_lidar(frame, file_idx, frame_idx)
+        # self.save_pose(frame, file_idx, frame_idx)
+        # self.save_timestamp(frame, file_idx, frame_idx)
 
-            self.save_image(frame, file_idx, frame_idx)
-            self.save_calib(frame, file_idx, frame_idx)
-            self.save_lidar(frame, file_idx, frame_idx)
-            self.save_pose(frame, file_idx, frame_idx)
-            self.save_timestamp(frame, file_idx, frame_idx)
-
-            if not self.test_mode:
-                self.save_label(frame, file_idx, frame_idx)
+        # if not self.test_mode:
+        #     self.save_label(frame, file_idx, frame_idx)
 
     def __len__(self):
         """Length of the filename list."""
-        return len(self.tfrecord_pathnames)
+        return len(self.sample_files)
 
     def save_image(self, frame, file_idx, frame_idx):
         """Parse and save the images in jpg format. Jpg is the original format
@@ -392,145 +448,144 @@ class CODa2KITTI(object):
         for d in dir_list1:
             mmcv.mkdir_or_exist(d)
         for d in dir_list2:
-            for i in range(5):
+            for i in range(2):
                 mmcv.mkdir_or_exist(f'{d}{str(i)}')
+    # def convert_range_image_to_point_cloud(self,
+    #                                        frame,
+    #                                        range_images,
+    #                                        camera_projections,
+    #                                        range_image_top_pose,
+    #                                        ri_index=0):
+    #     """Convert range images to point cloud.
+    #     Args:
+    #         frame (:obj:`Frame`): Open dataset frame.
+    #         range_images (dict): Mapping from laser_name to list of two
+    #             range images corresponding with two returns.
+    #         camera_projections (dict): Mapping from laser_name to list of two
+    #             camera projections corresponding with two returns.
+    #         range_image_top_pose (:obj:`Transform`): Range image pixel pose for
+    #             top lidar.
+    #         ri_index (int, optional): 0 for the first return,
+    #             1 for the second return. Default: 0.
+    #     Returns:
+    #         tuple[list[np.ndarray]]: (List of points with shape [N, 3],
+    #             camera projections of points with shape [N, 6], intensity
+    #             with shape [N, 1], elongation with shape [N, 1], points'
+    #             position in the depth map (element offset if points come from
+    #             the main lidar otherwise -1) with shape[N, 1]). All the
+    #             lists have the length of lidar numbers (5).
+    #     """
+    #     calibrations = sorted(
+    #         frame.context.laser_calibrations, key=lambda c: c.name)
+    #     points = []
+    #     cp_points = []
+    #     intensity = []
+    #     elongation = []
+    #     mask_indices = []
 
-    def convert_range_image_to_point_cloud(self,
-                                           frame,
-                                           range_images,
-                                           camera_projections,
-                                           range_image_top_pose,
-                                           ri_index=0):
-        """Convert range images to point cloud.
-        Args:
-            frame (:obj:`Frame`): Open dataset frame.
-            range_images (dict): Mapping from laser_name to list of two
-                range images corresponding with two returns.
-            camera_projections (dict): Mapping from laser_name to list of two
-                camera projections corresponding with two returns.
-            range_image_top_pose (:obj:`Transform`): Range image pixel pose for
-                top lidar.
-            ri_index (int, optional): 0 for the first return,
-                1 for the second return. Default: 0.
-        Returns:
-            tuple[list[np.ndarray]]: (List of points with shape [N, 3],
-                camera projections of points with shape [N, 6], intensity
-                with shape [N, 1], elongation with shape [N, 1], points'
-                position in the depth map (element offset if points come from
-                the main lidar otherwise -1) with shape[N, 1]). All the
-                lists have the length of lidar numbers (5).
-        """
-        calibrations = sorted(
-            frame.context.laser_calibrations, key=lambda c: c.name)
-        points = []
-        cp_points = []
-        intensity = []
-        elongation = []
-        mask_indices = []
+    #     frame_pose = tf.convert_to_tensor(
+    #         value=np.reshape(np.array(frame.pose.transform), [4, 4]))
+    #     # [H, W, 6]
+    #     range_image_top_pose_tensor = tf.reshape(
+    #         tf.convert_to_tensor(value=range_image_top_pose.data),
+    #         range_image_top_pose.shape.dims)
+    #     # [H, W, 3, 3]
+    #     range_image_top_pose_tensor_rotation = \
+    #         transform_utils.get_rotation_matrix(
+    #             range_image_top_pose_tensor[..., 0],
+    #             range_image_top_pose_tensor[..., 1],
+    #             range_image_top_pose_tensor[..., 2])
+    #     range_image_top_pose_tensor_translation = \
+    #         range_image_top_pose_tensor[..., 3:]
+    #     range_image_top_pose_tensor = transform_utils.get_transform(
+    #         range_image_top_pose_tensor_rotation,
+    #         range_image_top_pose_tensor_translation)
+    #     for c in calibrations:
+    #         range_image = range_images[c.name][ri_index]
+    #         if len(c.beam_inclinations) == 0:
+    #             beam_inclinations = range_image_utils.compute_inclination(
+    #                 tf.constant(
+    #                     [c.beam_inclination_min, c.beam_inclination_max]),
+    #                 height=range_image.shape.dims[0])
+    #         else:
+    #             beam_inclinations = tf.constant(c.beam_inclinations)
 
-        frame_pose = tf.convert_to_tensor(
-            value=np.reshape(np.array(frame.pose.transform), [4, 4]))
-        # [H, W, 6]
-        range_image_top_pose_tensor = tf.reshape(
-            tf.convert_to_tensor(value=range_image_top_pose.data),
-            range_image_top_pose.shape.dims)
-        # [H, W, 3, 3]
-        range_image_top_pose_tensor_rotation = \
-            transform_utils.get_rotation_matrix(
-                range_image_top_pose_tensor[..., 0],
-                range_image_top_pose_tensor[..., 1],
-                range_image_top_pose_tensor[..., 2])
-        range_image_top_pose_tensor_translation = \
-            range_image_top_pose_tensor[..., 3:]
-        range_image_top_pose_tensor = transform_utils.get_transform(
-            range_image_top_pose_tensor_rotation,
-            range_image_top_pose_tensor_translation)
-        for c in calibrations:
-            range_image = range_images[c.name][ri_index]
-            if len(c.beam_inclinations) == 0:
-                beam_inclinations = range_image_utils.compute_inclination(
-                    tf.constant(
-                        [c.beam_inclination_min, c.beam_inclination_max]),
-                    height=range_image.shape.dims[0])
-            else:
-                beam_inclinations = tf.constant(c.beam_inclinations)
+    #         beam_inclinations = tf.reverse(beam_inclinations, axis=[-1])
+    #         extrinsic = np.reshape(np.array(c.extrinsic.transform), [4, 4])
 
-            beam_inclinations = tf.reverse(beam_inclinations, axis=[-1])
-            extrinsic = np.reshape(np.array(c.extrinsic.transform), [4, 4])
+    #         range_image_tensor = tf.reshape(
+    #             tf.convert_to_tensor(value=range_image.data),
+    #             range_image.shape.dims)
+    #         pixel_pose_local = None
+    #         frame_pose_local = None
+    #         if c.name == dataset_pb2.LaserName.TOP:
+    #             pixel_pose_local = range_image_top_pose_tensor
+    #             pixel_pose_local = tf.expand_dims(pixel_pose_local, axis=0)
+    #             frame_pose_local = tf.expand_dims(frame_pose, axis=0)
+    #         range_image_mask = range_image_tensor[..., 0] > 0
 
-            range_image_tensor = tf.reshape(
-                tf.convert_to_tensor(value=range_image.data),
-                range_image.shape.dims)
-            pixel_pose_local = None
-            frame_pose_local = None
-            if c.name == dataset_pb2.LaserName.TOP:
-                pixel_pose_local = range_image_top_pose_tensor
-                pixel_pose_local = tf.expand_dims(pixel_pose_local, axis=0)
-                frame_pose_local = tf.expand_dims(frame_pose, axis=0)
-            range_image_mask = range_image_tensor[..., 0] > 0
+    #         if self.filter_no_label_zone_points:
+    #             nlz_mask = range_image_tensor[..., 3] != 1.0  # 1.0: in NLZ
+    #             range_image_mask = range_image_mask & nlz_mask
 
-            if self.filter_no_label_zone_points:
-                nlz_mask = range_image_tensor[..., 3] != 1.0  # 1.0: in NLZ
-                range_image_mask = range_image_mask & nlz_mask
+    #         range_image_cartesian = \
+    #             range_image_utils.extract_point_cloud_from_range_image(
+    #                 tf.expand_dims(range_image_tensor[..., 0], axis=0),
+    #                 tf.expand_dims(extrinsic, axis=0),
+    #                 tf.expand_dims(tf.convert_to_tensor(
+    #                     value=beam_inclinations), axis=0),
+    #                 pixel_pose=pixel_pose_local,
+    #                 frame_pose=frame_pose_local)
 
-            range_image_cartesian = \
-                range_image_utils.extract_point_cloud_from_range_image(
-                    tf.expand_dims(range_image_tensor[..., 0], axis=0),
-                    tf.expand_dims(extrinsic, axis=0),
-                    tf.expand_dims(tf.convert_to_tensor(
-                        value=beam_inclinations), axis=0),
-                    pixel_pose=pixel_pose_local,
-                    frame_pose=frame_pose_local)
+    #         mask_index = tf.where(range_image_mask)
 
-            mask_index = tf.where(range_image_mask)
+    #         range_image_cartesian = tf.squeeze(range_image_cartesian, axis=0)
+    #         points_tensor = tf.gather_nd(range_image_cartesian, mask_index)
 
-            range_image_cartesian = tf.squeeze(range_image_cartesian, axis=0)
-            points_tensor = tf.gather_nd(range_image_cartesian, mask_index)
+    #         cp = camera_projections[c.name][ri_index]
+    #         cp_tensor = tf.reshape(
+    #             tf.convert_to_tensor(value=cp.data), cp.shape.dims)
+    #         cp_points_tensor = tf.gather_nd(cp_tensor, mask_index)
+    #         points.append(points_tensor.numpy())
+    #         cp_points.append(cp_points_tensor.numpy())
 
-            cp = camera_projections[c.name][ri_index]
-            cp_tensor = tf.reshape(
-                tf.convert_to_tensor(value=cp.data), cp.shape.dims)
-            cp_points_tensor = tf.gather_nd(cp_tensor, mask_index)
-            points.append(points_tensor.numpy())
-            cp_points.append(cp_points_tensor.numpy())
+    #         intensity_tensor = tf.gather_nd(range_image_tensor[..., 1],
+    #                                         mask_index)
+    #         intensity.append(intensity_tensor.numpy())
 
-            intensity_tensor = tf.gather_nd(range_image_tensor[..., 1],
-                                            mask_index)
-            intensity.append(intensity_tensor.numpy())
+    #         elongation_tensor = tf.gather_nd(range_image_tensor[..., 2],
+    #                                          mask_index)
+    #         elongation.append(elongation_tensor.numpy())
+    #         if c.name == 1:
+    #             mask_index = (ri_index * range_image_mask.shape[0] +
+    #                           mask_index[:, 0]
+    #                           ) * range_image_mask.shape[1] + mask_index[:, 1]
+    #             mask_index = mask_index.numpy().astype(elongation[-1].dtype)
+    #         else:
+    #             mask_index = np.full_like(elongation[-1], -1)
 
-            elongation_tensor = tf.gather_nd(range_image_tensor[..., 2],
-                                             mask_index)
-            elongation.append(elongation_tensor.numpy())
-            if c.name == 1:
-                mask_index = (ri_index * range_image_mask.shape[0] +
-                              mask_index[:, 0]
-                              ) * range_image_mask.shape[1] + mask_index[:, 1]
-                mask_index = mask_index.numpy().astype(elongation[-1].dtype)
-            else:
-                mask_index = np.full_like(elongation[-1], -1)
+    #         mask_indices.append(mask_index)
 
-            mask_indices.append(mask_index)
+    #     return points, cp_points, intensity, elongation, mask_indices
 
-        return points, cp_points, intensity, elongation, mask_indices
-
-    def cart_to_homo(self, mat):
-        """Convert transformation matrix in Cartesian coordinates to
-        homogeneous format.
-        Args:
-            mat (np.ndarray): Transformation matrix in Cartesian.
-                The input matrix shape is 3x3 or 3x4.
-        Returns:
-            np.ndarray: Transformation matrix in homogeneous format.
-                The matrix shape is 4x4.
-        """
-        ret = np.eye(4)
-        if mat.shape == (3, 3):
-            ret[:3, :3] = mat
-        elif mat.shape == (3, 4):
-            ret[:3, :] = mat
-        else:
-            raise ValueError(mat.shape)
-        return 
+    # def cart_to_homo(self, mat):
+    #     """Convert transformation matrix in Cartesian coordinates to
+    #     homogeneous format.
+    #     Args:
+    #         mat (np.ndarray): Transformation matrix in Cartesian.
+    #             The input matrix shape is 3x3 or 3x4.
+    #     Returns:
+    #         np.ndarray: Transformation matrix in homogeneous format.
+    #             The matrix shape is 4x4.
+    #     """
+    #     ret = np.eye(4)
+    #     if mat.shape == (3, 3):
+    #         ret[:3, :3] = mat
+    #     elif mat.shape == (3, 4):
+    #         ret[:3, :] = mat
+    #     else:
+    #         raise ValueError(mat.shape)
+    #     return 
 
 # # Copyright (c) OpenMMLab. All rights reserved.
 # import os
