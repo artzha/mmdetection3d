@@ -32,9 +32,8 @@ class CODa2KITTI(object):
     def __init__(self,
                  load_dir,
                  save_dir,
-                 prefix,
                  workers=64,
-                 split="train",
+                 split="training",
                  test_mode=False):
         self.filter_empty_3dboxes = True
         self.filter_no_label_zone_points = True
@@ -120,8 +119,10 @@ class CODa2KITTI(object):
         }
 
         self.load_dir = load_dir
-        self.save_dir = join(save_dir, split)
-        self.prefix = prefix
+        if split=="validation" or split=="training":
+            self.save_dir = join(save_dir, "training")
+        else:
+            self.save_dir = join(save_dir, split)
         self.workers = int(workers)
         self.split = split
         self.test_mode = test_mode
@@ -133,6 +134,7 @@ class CODa2KITTI(object):
         self.point_cloud_save_dir = f'{self.save_dir}/velodyne'
         self.pose_save_dir = f'{self.save_dir}/pose'
         self.timestamp_save_dir = f'{self.save_dir}/timestamp'
+        self.imageset_save_dir = f'{save_dir}/ImageSets'
 
         self.bbox_label_files = []
         self.image_files = [] # Store cam0 as paths
@@ -147,6 +149,7 @@ class CODa2KITTI(object):
 
         self.process_metadata()
         self.create_folder()
+        self.create_imagesets()
 
     def process_metadata(self):
         metadata_path = join(self.load_dir, "metadata")
@@ -169,6 +172,25 @@ class CODa2KITTI(object):
             image_list = [label_path.replace('3d_label', '2d_rect')
                 .replace('os1', 'cam0').replace('.json', '.png') for label_path in label_list]
             self.image_files.extend(image_list)
+
+    def create_imagesets(self):
+        if self.split=="testing":
+            imageset_file = "test.txt"
+        elif self.split=="training":
+            imageset_file = "train.txt"
+        elif self.split=="validation":
+            imageset_file = "val.txt"
+
+        imageset_path = join(self.imageset_save_dir, imageset_file)
+        imageset_fp = open(imageset_path, 'w+')
+        
+        for lidar_path in self.lidar_files:
+            lidar_file = lidar_path.split('/')[-1]
+            _, _, traj, frame = self.get_filename_info(lidar_file)
+            frame_name = f'{str(traj).zfill(2)}{str(frame).zfill(5)}'
+            imageset_fp.write(frame_name+'\n')
+
+        imageset_fp.close()
 
     def convert(self):
         """Convert action."""
@@ -258,7 +280,7 @@ class CODa2KITTI(object):
             img_path = join(self.load_dir, '2d_rect', cam, str(traj), img_file)
 
             cam_id = cam[-1]
-            self.save_image(img_path, cam_id, frame_idx, file_idx)
+            self.save_image(traj, img_path, cam_id, frame_idx, file_idx)
             if not self.test_mode:
                 self.save_label(traj, cam_id, frame_idx, file_idx)
         
@@ -274,7 +296,7 @@ class CODa2KITTI(object):
         """Length of the filename list."""
         return len(self.bbox_label_files)
 
-    def save_image(self, src_img_path, cam_id, frame_idx, file_idx):
+    def save_image(self, traj, src_img_path, cam_id, frame_idx, file_idx):
         """Parse and save the images in jpg format. Jpg is the original format
         used by Waymo Open dataset. Saving in png format will cause huge (~3x)
         unnesssary storage waste.
@@ -287,7 +309,7 @@ class CODa2KITTI(object):
         """
         assert isfile(src_img_path), "Image file does not exist: %s" % src_img_path
         kitti_img_path = f'{self.image_save_dir}{str(cam_id)}/' + \
-                f'{str(file_idx).zfill(7)}.jpg'
+                f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.jpg'
         shutil.copyfile(src_img_path, kitti_img_path)
 
     def save_calib(self, traj, frame_idx, file_idx):
@@ -336,7 +358,7 @@ class CODa2KITTI(object):
 
         with open(
                 f'{self.calib_save_dir}/' +
-                f'{str(file_idx).zfill(7)}.txt',
+                f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.txt',
                 'w+') as fp_calib:
             fp_calib.write(calib_context)
             fp_calib.close()
@@ -351,10 +373,10 @@ class CODa2KITTI(object):
         bin_path = join(self.load_dir, "3d_raw", "os1", traj, bin_file)
         assert isfile(bin_path), "Bin file for traj %s frame %s does not exist: %s" % (traj, frame_idx, bin_path)
         point_cloud = np.fromfile(bin_path, dtype=np.float32).reshape(-1, 4)
-
+    
         pc_path = f'{self.point_cloud_save_dir}/' + \
-            f'{str(file_idx).zfill(7)}.bin'
-
+            f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.bin'
+ 
         point_cloud.astype(np.float32).tofile(pc_path)
 
     def save_label(self, traj, cam_id, frame_idx, file_idx):
@@ -390,7 +412,7 @@ class CODa2KITTI(object):
 
         fp_label_all = open(
             f'{self.label_all_save_dir}/' +
-            f'{str(file_idx).zfill(7)}.txt', 'w+')
+            f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.txt', 'w+')
         id_to_bbox = dict()
         id_to_name = dict()
         for anno_idx, tred_anno in enumerate(anno_dict["3dbbox"]):
@@ -440,11 +462,11 @@ class CODa2KITTI(object):
                     round(x, 2), round(y, 2), round(z, 2),
                     round(rotation_y, 2))
 
-            line_all = line[:-1] + ' ' + name + '\n'
-                
+            line_all = line[:-1] + '\n'
+
             fp_label = open(
                 f'{self.label_save_dir}{cam_id}/' +
-                f'{str(file_idx).zfill(7)}.txt', 'a')
+                f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.txt', 'a')
             fp_label.write(line)
             fp_label.close()
 
@@ -476,7 +498,7 @@ class CODa2KITTI(object):
        
         np.savetxt(
             join(f'{self.pose_save_dir}/' +
-                 f'{str(file_idx).zfill(7)}.txt'),
+                 f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.txt'),
             pose_kitti)
 
     def save_timestamp(self, traj, frame_idx, file_idx):
@@ -498,7 +520,7 @@ class CODa2KITTI(object):
 
         with open(
                 join(f'{self.timestamp_save_dir}/' +
-                     f'{str(file_idx).zfill(7)}.txt'),
+                     f'{str(traj).zfill(2)}{str(frame_idx).zfill(5)}.txt'),
                 'w') as f:
             f.write(str(ts_us_np))
 
@@ -508,13 +530,13 @@ class CODa2KITTI(object):
             dir_list1 = [
                 self.label_all_save_dir, self.calib_save_dir,
                 self.point_cloud_save_dir, self.pose_save_dir,
-                self.timestamp_save_dir
+                self.timestamp_save_dir, self.imageset_save_dir
             ]
             dir_list2 = [self.label_save_dir, self.image_save_dir]
         else:
             dir_list1 = [
                 self.calib_save_dir, self.point_cloud_save_dir,
-                self.pose_save_dir, self.timestamp_save_dir
+                self.pose_save_dir, self.timestamp_save_dir, self.imageset_save_dir
             ]
             dir_list2 = [self.image_save_dir]
         for d in dir_list1:

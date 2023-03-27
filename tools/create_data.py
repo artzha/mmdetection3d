@@ -201,7 +201,8 @@ def waymo_data_prep(root_path,
 def coda_data_prep(root_path,
                     info_prefix,
                     out_dir,
-                    workers):
+                    workers,
+                    max_sweeps=5):
     """Prepare the info file for CODa dataset.
 
     Args:
@@ -216,16 +217,20 @@ def coda_data_prep(root_path,
     load_dir = osp.join(root_path, 'coda_format')
     save_dir = osp.join(root_path, 'kitti_format')
     
-    converter = coda.CODa2KITTI(
-        load_dir,
-        save_dir,
-        info_prefix,
-        workers
-    )
+    splits = ['training', 'testing', 'validation']
+    for split in splits:
+        converter = coda.CODa2KITTI(
+            load_dir,
+            save_dir,
+            workers=workers,
+            split=split
+        )
+        converter.convert()
+        print("length dataset ", len(converter))
 
-    print("length dataset ", len(converter))
-
-    converter.convert()
+    kitti.create_coda_info_file(
+        save_dir, info_prefix, max_sweeps=max_sweeps, workers=workers)
+    
 
 parser = argparse.ArgumentParser(description='Data converter arg parser')
 parser.add_argument('dataset', metavar='kitti', help='name of the dataset')
