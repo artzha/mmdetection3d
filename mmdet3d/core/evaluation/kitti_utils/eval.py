@@ -702,11 +702,11 @@ def kitti_eval(gt_annos,
     # }
     
     #KITTI model->KITTI dataset ClassRemap
-    # dt_to_gt_class_map = {
-    #     'Pedestrian': 'Pedestrian',
-    #     'Cyclist': 'Cyclist',
-    #     'Car' :'Car'
-    # }
+    dt_to_gt_class_map = {
+        'Pedestrian': 'Pedestrian',
+        'Cyclist': 'Cyclist',
+        'Car' :'Car'
+    }
 
     #KITTI model ->nuScenes dataset Classremap
     # dt_to_gt_class_map = {
@@ -730,11 +730,11 @@ def kitti_eval(gt_annos,
     # }
 
     #KITTI model -> Waymo dataset Class remap
-    dt_to_gt_class_map = {
-        'Pedestrian': 'Cyclist',
-        'Cyclist': 'Car',
-        'Car': 'Pedestrian'
-    }
+    # dt_to_gt_class_map = {
+    #     'Pedestrian': 'Cyclist',
+    #     'Cyclist': 'Car',
+    #     'Car': 'Pedestrian'
+    # }
 
     # import pdb; pdb.set_trace()
     # dt_to_gt_class_map = {

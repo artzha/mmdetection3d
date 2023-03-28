@@ -230,7 +230,15 @@ def coda_data_prep(root_path,
 
     kitti.create_coda_info_file(
         save_dir, info_prefix, max_sweeps=max_sweeps, workers=workers)
-    
+
+    GTDatabaseCreater(
+        'CODataset',
+        save_dir,
+        info_prefix,
+        f'{save_dir}/{info_prefix}_infos_train.pkl',
+        relative_path=False,
+        with_mask=False,
+        num_worker=workers).create()
 
 parser = argparse.ArgumentParser(description='Data converter arg parser')
 parser.add_argument('dataset', metavar='kitti', help='name of the dataset')
