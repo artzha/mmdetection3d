@@ -7,7 +7,7 @@ import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 
 from mmdet3d.core.bbox import box_np_ops, points_cam2img
-from .kitti_data_utils import WaymoInfoGatherer, get_kitti_image_info
+from .kitti_data_utils import WaymoInfoGatherer, CODaInfoGatherer, get_kitti_image_info
 from .nuscenes_converter import post_process_coords
 
 kitti_categories = ('Pedestrian', 'Cyclist', 'Car')
@@ -85,7 +85,11 @@ class _NumPointsInGTCalculater:
             count=-1).reshape([-1, self.num_features])
         rect = calib['R0_rect']
         Trv2c = calib['Tr_velo_to_cam']
-        P2 = calib['P2']
+
+        if 'P2' not in calib.keys():
+            P2 = calib['P0'] # Added to set different primary camera (ARTHUR)
+        else:
+            P2 = calib['P2']
         if self.remove_outside:
             points_v = box_np_ops.remove_outside_points(
                 points_v, rect, Trv2c, P2, image_info['image_shape'])
@@ -130,7 +134,14 @@ def _calculate_num_points_in_gt(data_path,
             v_path, dtype=np.float32, count=-1).reshape([-1, num_features])
         rect = calib['R0_rect']
         Trv2c = calib['Tr_velo_to_cam']
-        P2 = calib['P2']
+
+        if 'P2' not in calib.keys():
+            P2 = calib['P0'] # Added to set different primary camera (ARTHUR)
+        else:
+            P2 = calib['P2']
+        if self.remove_outside:
+            points_v = box_np_ops.remove_outside_points(
+                points_v, rect, Trv2c, P2, image_info['image_shape'])
         if remove_outside:
             points_v = box_np_ops.remove_outside_points(
                 points_v, rect, Trv2c, P2, image_info['image_shape'])
@@ -224,6 +235,81 @@ def create_kitti_info_file(data_path,
     filename = save_path / f'{pkl_prefix}_infos_test.pkl'
     print(f'Kitti info test file is saved to {filename}')
     mmcv.dump(kitti_infos_test, filename)
+
+def create_coda_info_file(data_path,
+                          pkl_prefix='coda',
+                          save_path=None,
+                          relative_path=True,
+                          max_sweeps=5,
+                          workers=8):
+    """Create info file of coda dataset.
+
+    Given the raw data, generate its related info file in pkl format.
+
+    Args:
+        data_path (str): Path of the data root.
+        pkl_prefix (str, optional): Prefix of the info file to be generated.
+            Default: 'coda'.
+        save_path (str, optional): Path to save the info file.
+            Default: None.
+        relative_path (bool, optional): Whether to use relative path.
+            Default: True.
+        max_sweeps (int, optional): Max sweeps before the detection frame
+            to be used. Default: 5.
+    """
+    imageset_folder = Path(data_path) / 'ImageSets'
+    train_img_ids = _read_imageset_file(str(imageset_folder / 'train.txt'))
+    val_img_ids = _read_imageset_file(str(imageset_folder / 'val.txt'))
+    test_img_ids = _read_imageset_file(str(imageset_folder / 'test.txt'))
+
+    print('Generate info. this may take several minutes.')
+    if save_path is None:
+        save_path = Path(data_path)
+    else:
+        save_path = Path(save_path)
+    coda_infos_gatherer_trainval = CODaInfoGatherer(
+        data_path,
+        training=True,
+        velodyne=True,
+        calib=True,
+        pose=True,
+        relative_path=relative_path,
+        max_sweeps=max_sweeps,
+        num_worker=workers)
+    coda_infos_gatherer_test = CODaInfoGatherer(
+        data_path,
+        training=False,
+        label_info=False,
+        velodyne=True,
+        calib=True,
+        pose=True,
+        relative_path=relative_path,
+        max_sweeps=max_sweeps,
+        num_worker=workers)
+    num_points_in_gt_calculater = _NumPointsInGTCalculater(
+        data_path,
+        relative_path,
+        num_features=4,
+        remove_outside=False,
+        num_worker=workers)
+
+    coda_infos_train = coda_infos_gatherer_trainval.gather(train_img_ids)
+    num_points_in_gt_calculater.calculate(coda_infos_train)
+    filename = save_path / f'{pkl_prefix}_infos_train.pkl'
+    print(f'CODa info train file is saved to {filename}')
+    mmcv.dump(coda_infos_train, filename)
+    coda_infos_val = coda_infos_gatherer_trainval.gather(val_img_ids)
+    num_points_in_gt_calculater.calculate(coda_infos_val)
+    filename = save_path / f'{pkl_prefix}_infos_val.pkl'
+    print(f'CODa info val file is saved to {filename}')
+    mmcv.dump(coda_infos_val, filename)
+    filename = save_path / f'{pkl_prefix}_infos_trainval.pkl'
+    print(f'CODa info trainval file is saved to {filename}')
+    mmcv.dump(coda_infos_train + coda_infos_val, filename)
+    coda_infos_test = coda_infos_gatherer_test.gather(test_img_ids)
+    filename = save_path / f'{pkl_prefix}_infos_test.pkl'
+    print(f'CODa info test file is saved to {filename}')
+    mmcv.dump(coda_infos_test, filename)
 
 
 def create_waymo_info_file(data_path,

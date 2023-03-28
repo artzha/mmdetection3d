@@ -200,7 +200,6 @@ def waymo_data_prep(root_path,
 
 def coda_data_prep(root_path,
                     info_prefix,
-                    version,
                     out_dir,
                     workers,
                     max_sweeps=5):
@@ -211,12 +210,35 @@ def coda_data_prep(root_path,
         info_prefix (str): The prefix of info filenames.
         out_dir (str): Output directory of the generated info file.
         workers (int): Number of threads to be used.
-        max_sweeps (int, optional): Number of input consecutive frames.
-            Default: 5. Here we store pose information of these frames
-            for later use.
     """
-    coda_converter.create_coda_infos(
-        root_path, info_prefix, version=version, max_sweeps=max_sweeps)
+
+    from tools.data_converter import coda_converter as coda
+
+    load_dir = osp.join(root_path, 'coda_format')
+    save_dir = osp.join(root_path, 'kitti_format')
+    
+    splits = ['training', 'testing', 'validation']
+    for split in splits:
+        converter = coda.CODa2KITTI(
+            load_dir,
+            save_dir,
+            workers=workers,
+            split=split
+        )
+        converter.convert()
+        print("length dataset ", len(converter))
+
+    kitti.create_coda_info_file(
+        save_dir, info_prefix, max_sweeps=max_sweeps, workers=workers)
+
+    GTDatabaseCreater(
+        'CODataset',
+        save_dir,
+        info_prefix,
+        f'{save_dir}/{info_prefix}_infos_train.pkl',
+        relative_path=False,
+        with_mask=False,
+        num_worker=workers).create()
 
 parser = argparse.ArgumentParser(description='Data converter arg parser')
 parser.add_argument('dataset', metavar='kitti', help='name of the dataset')
@@ -331,3 +353,10 @@ if __name__ == '__main__':
             num_points=args.num_points,
             out_dir=args.out_dir,
             workers=args.workers)
+    elif args.dataset == 'coda':
+        coda_data_prep(
+            root_path=args.root_path,
+            info_prefix=args.extra_tag,
+            out_dir=args.out_dir,
+            workers=args.workers
+        )
